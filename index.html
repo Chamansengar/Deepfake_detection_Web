@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deepfake Detection using AI</title>
+    <meta name="description" content="Detect deepfake images and videos instantly with AI-powered analysis." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+    <!-- Particle canvas -->
+    <canvas id="particles"></canvas>
+
+    <!-- Glow orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <!-- ========== Navbar ========== -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-inner">
+            <a href="#" class="nav-logo">
+                <span class="logo-icon">&#9670;</span>
+                <span class="logo-text">Deepfake <span class="logo-accent">Detection</span></span>
+            </a>
+            <ul class="nav-links" id="nav-links">
+                <li><a href="#hero">Home</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#upload">Detect</a></li>
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ul>
+            <div class="nav-right">
+                <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+                    <span class="theme-icon" id="theme-icon">&#9790;</span>
+                </button>
+                <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+                    <span></span><span></span><span></span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ========== Hero ========== -->
+    <header class="hero" id="hero">
+        <div class="hero-content">
+            <p class="hero-tag">AI-Powered Media Analysis</p>
+            <h1 class="hero-title">Deepfake Detection<br><span class="gradient-text">using AI</span></h1>
+            <p class="hero-sub">Upload any image or video and let our advanced deep-learning models determine if it's authentic or synthetically generated — in seconds.</p>
+            <div class="hero-buttons">
+                <a href="#upload" class="hero-cta">Start Detecting &darr;</a>
+                <a href="#how-it-works" class="hero-cta-secondary">Learn More</a>
+            </div>
+            <div class="hero-formats">
+                <span class="format-badge">JPG</span>
+                <span class="format-badge">PNG</span>
+                <span class="format-badge">WEBP</span>
+                <span class="format-badge">MP4</span>
+                <span class="format-badge">AVI</span>
+                <span class="format-badge">MOV</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ========== Stats ========== -->
+    <section class="stats-bar">
+        <div class="stat" data-target="98.7" data-suffix="%">
+            <span class="stat-number">0</span>
+            <span class="stat-label">Accuracy</span>
+        </div>
+        <div class="stat" data-target="1200000" data-suffix="+">
+            <span class="stat-number">0</span>
+            <span class="stat-label">Scans Completed</span>
+        </div>
+        <div class="stat" data-target="150" data-suffix="+">
+            <span class="stat-number">0</span>
+            <span class="stat-label">Models Trained</span>
+        </div>
+        <div class="stat" data-target="50" data-suffix="ms">
+            <span class="stat-number">0</span>
+            <span class="stat-label">Avg Response</span>
+        </div>
+    </section>
+
+    <!-- ========== Features ========== -->
+    <section class="features" id="features">
+        <h2 class="section-title">Why Choose <span class="gradient-text">Our AI</span>?</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">&#128269;</div>
+                <h3>Pixel-Level Analysis</h3>
+                <p>Our AI examines every pixel for subtle artefacts invisible to the human eye.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#9889;</div>
+                <h3>Real-Time Results</h3>
+                <p>Get instant feedback with confidence scores so you can act quickly.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#127909;</div>
+                <h3>Video Support</h3>
+                <p>Frame-by-frame deepfake detection across entire video files.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128274;</div>
+                <h3>Private &amp; Secure</h3>
+                <p>Your uploads are never stored. All processing happens in-session.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#129504;</div>
+                <h3>Multi-Model AI</h3>
+                <p>Ensemble of CNN, transformer, and frequency-domain models for maximum accuracy.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128202;</div>
+                <h3>Detailed Reports</h3>
+                <p>Heatmaps highlighting manipulated regions with per-frame analysis breakdowns.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== Upload / Detect ========== -->
+    <section class="upload-section" id="upload">
+        <h2 class="section-title">Upload &amp; <span class="gradient-text">Detect</span></h2>
+        <div class="upload-card glass-card">
+            <div class="upload-tabs">
+                <button class="tab active" data-tab="image">&#128247; Image</button>
+                <button class="tab" data-tab="video">&#127909; Video</button>
+            </div>
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">&#128228;</div>
+                <p class="upload-main-text">Drag &amp; drop your file here</p>
+                <p class="upload-sub-text">or click to browse &middot; Max 50 MB</p>
+                <input type="file" id="file-input" accept="image/*,video/*" />
+            </div>
+            <div class="file-info" id="file-info" hidden>
+                <div class="file-details">
+                    <span class="file-icon" id="file-type-icon">&#128196;</span>
+                    <div>
+                        <span class="file-name" id="file-name"></span>
+                        <span class="file-size" id="file-size"></span>
+                    </div>
+                </div>
+                <button class="remove-file" id="remove-file">&times;</button>
+            </div>
+            <button class="detect-btn" id="detect-btn" disabled>
+                <span class="btn-text">Analyse Media</span>
+                <span class="btn-loader" hidden></span>
+            </button>
+        </div>
+
+        <!-- Result -->
+        <div class="result-card glass-card" id="result-section" hidden>
+            <h3>Analysis Result</h3>
+            <div id="preview-container"></div>
+            <div class="result-badge" id="result-badge"></div>
+            <div class="confidence-bar-wrap" id="confidence-wrap" hidden>
+                <span class="conf-label">Confidence</span>
+                <div class="confidence-track"><div class="confidence-fill" id="confidence-fill"></div></div>
+                <span class="conf-value" id="conf-value">0%</span>
+            </div>
+            <div class="result-details" id="result-details" hidden>
+                <div class="detail-row"><span>Model Used</span><span id="detail-model">EfficientNet-B7</span></div>
+                <div class="detail-row"><span>Processing Time</span><span id="detail-time">—</span></div>
+                <div class="detail-row"><span>File Type</span><span id="detail-type">—</span></div>
+                <div class="detail-row"><span>Resolution</span><span id="detail-res">—</span></div>
+            </div>
+            <button class="download-report-btn" id="download-report" hidden>&#128196; Download Report</button>
+        </div>
+    </section>
+
+    <!-- ========== How It Works ========== -->
+    <section class="how-section" id="how-it-works">
+        <h2 class="section-title">How It <span class="gradient-text">Works</span></h2>
+        <div class="steps">
+            <div class="step">
+                <div class="step-num">1</div>
+                <h4>Upload</h4>
+                <p>Select or drag-and-drop an image or video file.</p>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step">
+                <div class="step-num">2</div>
+                <h4>AI Analysis</h4>
+                <p>Deep-learning models inspect every frame for manipulation traces.</p>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step">
+                <div class="step-num">3</div>
+                <h4>Instant Verdict</h4>
+                <p>Receive a clear Authentic / Deepfake verdict with a confidence score.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== Testimonials ========== -->
+    <section class="testimonials" id="testimonials">
+        <h2 class="section-title">Trusted by <span class="gradient-text">Experts</span></h2>
+        <div class="testimonial-track" id="testimonial-track">
+            <div class="testimonial-card glass-card">
+                <p class="testimonial-text">"This tool detected manipulated footage our manual review team missed. A game-changer for newsroom verification."</p>
+                <div class="testimonial-author">
+                    <div class="author-avatar">JR</div>
+                    <div><strong>James Reed</strong><span>Senior Editor, Digital Media</span></div>
+                </div>
+            </div>
+            <div class="testimonial-card glass-card">
+                <p class="testimonial-text">"Integrated into our content moderation pipeline. False-positive rate is remarkably low across millions of uploads."</p>
+                <div class="testimonial-author">
+                    <div class="author-avatar">SP</div>
+                    <div><strong>Sara Patel</strong><span>Trust &amp; Safety Lead</span></div>
+                </div>
+            </div>
+            <div class="testimonial-card glass-card">
+                <p class="testimonial-text">"The confidence scoring and heatmap overlays give us exactly the forensic evidence we need for investigations."</p>
+                <div class="testimonial-author">
+                    <div class="author-avatar">MK</div>
+                    <div><strong>Michael Kim</strong><span>Cyber Forensics Analyst</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="testimonial-dots" id="testimonial-dots"></div>
+    </section>
+
+    <!-- ========== FAQ ========== -->
+    <section class="faq-section" id="faq">
+        <h2 class="section-title">Frequently Asked <span class="gradient-text">Questions</span></h2>
+        <div class="faq-list">
+            <div class="faq-item">
+                <button class="faq-question">What types of deepfakes can this detect?<span class="faq-chevron">&#9660;</span></button>
+                <div class="faq-answer"><p>Our AI detects face-swaps, face re-enactments, lip-sync manipulations, and fully AI-generated faces/videos created by tools like Stable Diffusion, Midjourney, DALL-E, and GANs.</p></div>
+            </div>
+            <div class="faq-item">
+                <button class="faq-question">Is my uploaded data stored?<span class="faq-chevron">&#9660;</span></button>
+                <div class="faq-answer"><p>No. All files are processed in-memory and discarded immediately after analysis. We never store, share, or log your uploads.</p></div>
+            </div>
+            <div class="faq-item">
+                <button class="faq-question">What file formats are supported?<span class="faq-chevron">&#9660;</span></button>
+                <div class="faq-answer"><p>Images: JPG, PNG, WEBP, BMP, TIFF. Videos: MP4, AVI, MOV, MKV, WEBM. Maximum file size is 50 MB.</p></div>
+            </div>
+            <div class="faq-item">
+                <button class="faq-question">How accurate is the detection?<span class="faq-chevron">&#9660;</span></button>
+                <div class="faq-answer"><p>Our ensemble model achieves 98.7% accuracy on standard benchmarks (FaceForensics++, Celeb-DF v2). Accuracy may vary on novel generation techniques.</p></div>
+            </div>
+            <div class="faq-item">
+                <button class="faq-question">Can I integrate this into my own application?<span class="faq-chevron">&#9660;</span></button>
+                <div class="faq-answer"><p>Yes! We offer a REST API for programmatic access. Contact us for API keys and documentation.</p></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== Footer ========== -->
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <span class="logo-icon">&#9670;</span>
+                <span class="logo-text">Deepfake <span class="logo-accent">Detection</span></span>
+                <p class="footer-tagline">AI-powered media authenticity analysis.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="#hero">Home</a></li>
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="#upload">Detect</a></li>
+                    <li><a href="#how-it-works">How It Works</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h4>Resources</h4>
+                <ul>
+                    <li><a href="#">Documentation</a></li>
+                    <li><a href="#">API Reference</a></li>
+                    <li><a href="#">Privacy Policy</a></li>
+                    <li><a href="#">Contact Us</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h4>Connect</h4>
+                <ul>
+                    <li><a href="#">GitHub</a></li>
+                    <li><a href="#">Twitter / X</a></li>
+                    <li><a href="#">LinkedIn</a></li>
+                    <li><a href="#">Discord</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Deepfake Detection using AI. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Back to top -->
+    <button class="back-to-top" id="back-to-top" aria-label="Back to top">&#8593;</button>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
