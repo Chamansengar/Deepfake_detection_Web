@@ -120,26 +120,100 @@ const statsObserver = new IntersectionObserver((entries, obs) => {
 }, { threshold: 0.3 });
 statsObserver.observe(document.querySelector('.stats-bar'));
 
-// ---------- Upload tabs ----------
+// ---------- Backend Connection & Status Check ----------
+const engineStatus = document.getElementById('engine-status');
+const engineStatusText = document.getElementById('engine-status-text');
+let backendDeviceInfo = 'CPU';
+let temporalAvailable = false;
+
+async function checkBackendStatus() {
+  try {
+    const res = await fetch('/api/status', { method: 'GET' });
+    if (res.ok) {
+      const data = await res.json();
+      engineStatus.classList.add('online');
+      engineStatus.classList.remove('offline');
+      backendDeviceInfo = data.device || 'CPU';
+      temporalAvailable = Boolean(data.temporal_model_available);
+
+      const ckptStatus = data.checkpoint && data.checkpoint.loaded ? 'Fine-tuned' : 'Pretrained';
+      engineStatusText.textContent = `AI Engine Online (${data.model} · ${ckptStatus} · ${backendDeviceInfo})`;
+
+      // Enable temporal toggle if backend has it
+      const tempWrapper = document.getElementById('temporal-wrapper');
+      const tempInput = document.getElementById('param-temporal');
+      const tempHint = document.getElementById('temporal-hint');
+      if (tempInput) {
+        tempInput.disabled = !temporalAvailable;
+        if (!temporalAvailable && tempHint) {
+          tempHint.textContent = 'Temporal checkpoint not found — using frame-by-frame analysis';
+        }
+      }
+    } else {
+      throw new Error('Server returned non-200');
+    }
+  } catch (err) {
+    if (engineStatus) {
+      engineStatus.classList.add('offline');
+      engineStatus.classList.remove('online');
+      engineStatusText.textContent = 'AI Engine Offline (Run python app.py)';
+    }
+  }
+}
+checkBackendStatus();
+
+// ---------- Upload tabs & Settings Mode ----------
+const frameskipWrapper = document.getElementById('frameskip-wrapper');
+const temporalWrapper = document.getElementById('temporal-wrapper');
+let currentMode = 'image';
+
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
-    const type = tab.dataset.tab;
+    currentMode = tab.dataset.tab;
     const fileInput = document.getElementById('file-input');
-    fileInput.accept = type === 'video' ? 'video/*' : 'image/*';
-    showToast(`Switched to ${type} mode`, 'info', 2000);
+    fileInput.accept = currentMode === 'video' ? 'video/*' : 'image/*';
+
+    if (frameskipWrapper) frameskipWrapper.hidden = (currentMode !== 'video');
+    if (temporalWrapper) temporalWrapper.hidden = (currentMode !== 'video');
+
+    clearFile();
+    showToast(`Switched to ${currentMode} detection mode`, 'info', 2000);
   });
 });
+
+// ---------- Settings Accordion & Sliders ----------
+const settingsToggle = document.getElementById('settings-toggle');
+const settingsPanel = document.getElementById('settings-panel');
+if (settingsToggle && settingsPanel) {
+  settingsToggle.addEventListener('click', () => {
+    settingsPanel.classList.toggle('open');
+  });
+}
+
+const paramThreshold = document.getElementById('param-threshold');
+const thresholdVal = document.getElementById('threshold-val');
+if (paramThreshold && thresholdVal) {
+  paramThreshold.addEventListener('input', e => {
+    thresholdVal.textContent = parseFloat(e.target.value).toFixed(2);
+  });
+}
+
+const paramFrameskip = document.getElementById('param-frameskip');
+const frameskipVal = document.getElementById('frameskip-val');
+if (paramFrameskip && frameskipVal) {
+  paramFrameskip.addEventListener('input', e => {
+    frameskipVal.textContent = e.target.value;
+  });
+}
 
 // ---------- FAQ accordion ----------
 document.querySelectorAll('.faq-question').forEach(btn => {
   btn.addEventListener('click', () => {
     const item = btn.parentElement;
     const wasOpen = item.classList.contains('open');
-    // Close all
     document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
-    // Toggle current
     if (!wasOpen) item.classList.add('open');
   });
 });
@@ -147,6 +221,7 @@ document.querySelectorAll('.faq-question').forEach(btn => {
 // ---------- Testimonials carousel ----------
 (function initTestimonials() {
   const track = document.getElementById('testimonial-track');
+  if (!track) return;
   const cards = track.querySelectorAll('.testimonial-card');
   const dotsWrap = document.getElementById('testimonial-dots');
   let current = 0;
@@ -164,21 +239,22 @@ document.querySelectorAll('.faq-question').forEach(btn => {
     dotsWrap.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === index));
   }
 
-  // Auto-play
   setInterval(() => goTo((current + 1) % cards.length), 5000);
 })();
 
-// ---------- Theme toggle (visual only) ----------
+// ---------- Theme toggle ----------
 const themeToggle = document.getElementById('theme-toggle');
 const themeIcon = document.getElementById('theme-icon');
 let isDark = true;
-themeToggle.addEventListener('click', () => {
-  isDark = !isDark;
-  themeIcon.textContent = isDark ? '\u2606' : '\u2600'; // star / sun
-  showToast(isDark ? 'Dark mode enabled' : 'Light mode — coming soon!', 'info', 2000);
-});
+if (themeToggle) {
+  themeToggle.addEventListener('click', () => {
+    isDark = !isDark;
+    themeIcon.textContent = isDark ? '\u2606' : '\u2600';
+    showToast(isDark ? 'Dark mode enabled' : 'Light mode coming soon!', 'info', 2000);
+  });
+}
 
-// ---------- Upload logic ----------
+// ---------- Upload & Detection Elements ----------
 const uploadArea = document.getElementById('upload-area');
 const fileInput = document.getElementById('file-input');
 const detectBtn = document.getElementById('detect-btn');
@@ -198,7 +274,15 @@ const btnLoader = detectBtn.querySelector('.btn-loader');
 const resultDetails = document.getElementById('result-details');
 const downloadReport = document.getElementById('download-report');
 
+// Visualizer Switcher & Explanations
+const vizSwitcher = document.getElementById('viz-switcher');
+const camExplanation = document.getElementById('cam-explanation');
+const videoStatsGrid = document.getElementById('video-stats-grid');
+
 let selectedFile = null;
+let currentPreviewUrl = null;
+let currentViz = { original: null, face: null, cam: null };
+let lastAnalysisResult = null;
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + ' B';
@@ -216,6 +300,11 @@ function resetResult() {
   confValue.textContent = '0%';
   resultDetails.hidden = true;
   downloadReport.hidden = true;
+  if (vizSwitcher) vizSwitcher.hidden = true;
+  if (camExplanation) camExplanation.hidden = true;
+  if (videoStatsGrid) videoStatsGrid.hidden = true;
+  currentViz = { original: null, face: null, cam: null };
+  lastAnalysisResult = null;
 }
 
 function showFileInfo(file) {
@@ -226,6 +315,10 @@ function showFileInfo(file) {
 }
 
 function clearFile() {
+  if (currentPreviewUrl) {
+    URL.revokeObjectURL(currentPreviewUrl);
+    currentPreviewUrl = null;
+  }
   selectedFile = null;
   fileInput.value = '';
   fileInfo.hidden = true;
@@ -234,20 +327,6 @@ function clearFile() {
 }
 
 removeFileBtn.addEventListener('click', clearFile);
-
-function createPreview(file) {
-  const url = URL.createObjectURL(file);
-  previewContainer.innerHTML = '';
-  if (file.type.startsWith('video')) {
-    const vid = document.createElement('video');
-    vid.src = url; vid.controls = true;
-    previewContainer.appendChild(vid);
-  } else {
-    const img = document.createElement('img');
-    img.src = url; img.alt = 'Uploaded preview';
-    previewContainer.appendChild(img);
-  }
-}
 
 uploadArea.addEventListener('click', () => fileInput.click());
 uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
@@ -263,67 +342,240 @@ function handleFile(file) {
     showToast('File exceeds 50 MB limit', 'error');
     return;
   }
+  // Auto-switch tab if user dropped video into image tab or vice-versa
+  if (file.type.startsWith('video') && currentMode !== 'video') {
+    document.querySelector('.tab[data-tab="video"]').click();
+  } else if (file.type.startsWith('image') && currentMode !== 'image') {
+    document.querySelector('.tab[data-tab="image"]').click();
+  }
+
   selectedFile = file;
+  if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
+  currentPreviewUrl = URL.createObjectURL(file);
+
   showFileInfo(file);
   detectBtn.disabled = false;
   resetResult();
-  showToast('File ready for analysis', 'success', 2500);
+  showToast('File loaded. Click Analyse Media to run AI detection.', 'success', 2500);
 }
 
-// ---------- Detection ----------
+// ---------- Visualizer switcher (Original vs Face vs GradCAM) ----------
+if (vizSwitcher) {
+  vizSwitcher.querySelectorAll('.viz-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      vizSwitcher.querySelectorAll('.viz-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const view = btn.dataset.view;
+      showVisualizationView(view);
+    });
+  });
+}
+
+function showVisualizationView(view) {
+  const imgSrc = currentViz[view] || currentViz.original;
+  if (!imgSrc) return;
+  previewContainer.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = imgSrc;
+  img.alt = `${view} visualization`;
+  previewContainer.appendChild(img);
+
+  if (camExplanation) {
+    camExplanation.hidden = (view !== 'cam');
+  }
+}
+
+// ---------- Detection Request via FastAPI ----------
 detectBtn.addEventListener('click', async () => {
   if (!selectedFile) return;
 
-  btnText.textContent = 'Analysing…';
+  btnText.textContent = 'Analysing with AI…';
   btnLoader.hidden = false;
   detectBtn.disabled = true;
 
-  createPreview(selectedFile);
+  const threshold = parseFloat(paramThreshold ? paramThreshold.value : 0.50);
+  const useTta = document.getElementById('param-tta') ? document.getElementById('param-tta').checked : true;
+  const frameSkip = parseInt(paramFrameskip ? paramFrameskip.value : 5);
+  const useTemporal = document.getElementById('param-temporal') ? document.getElementById('param-temporal').checked : false;
 
-  const startTime = performance.now();
+  const isVideo = selectedFile.type.startsWith('video') || currentMode === 'video';
 
-  // ---- Replace with real API call ----
-  await new Promise(r => setTimeout(r, 2200));
-  const isDeepfake = Math.random() > 0.5;
-  const confidence = Math.floor(Math.random() * 20 + 80);
-  // ------------------------------------
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+  formData.append('threshold', threshold);
+  formData.append('use_tta', useTta);
 
-  const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+  if (isVideo) {
+    formData.append('frame_skip', frameSkip);
+    formData.append('use_temporal', useTemporal);
+  }
 
-  resultSection.hidden = false;
-  resultBadge.textContent = isDeepfake ? '⚠ Deepfake Detected' : '✓ Authentic';
-  resultBadge.classList.add(isDeepfake ? 'deepfake' : 'authentic');
+  const endpoint = isVideo ? '/api/detect-video' : '/api/detect-image';
 
-  confidenceWrap.hidden = false;
-  requestAnimationFrame(() => {
-    confidenceFill.style.width = confidence + '%';
-    confValue.textContent = confidence + '%';
-  });
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      body: formData
+    });
 
-  // Populate details
-  document.getElementById('detail-time').textContent = elapsed + ' s';
-  document.getElementById('detail-type').textContent = selectedFile.type || 'unknown';
-  document.getElementById('detail-res').textContent = '—'; // Populate from real API
-  resultDetails.hidden = false;
-  downloadReport.hidden = false;
+    if (!response.ok) {
+      const errJson = await response.json().catch(() => ({}));
+      throw new Error(errJson.detail || `Server error ${response.status}`);
+    }
 
-  btnText.textContent = 'Analyse Media';
-  btnLoader.hidden = true;
-  detectBtn.disabled = false;
+    const data = await response.json();
+    lastAnalysisResult = { ...data, fileName: selectedFile.name, fileSize: selectedFile.size, fileType: selectedFile.type };
 
-  resultSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (!data.success) {
+      showToast(data.message || 'Detection could not be completed.', 'error', 4500);
+      btnText.textContent = 'Analyse Media';
+      btnLoader.hidden = true;
+      detectBtn.disabled = false;
+      return;
+    }
 
-  showToast(
-    isDeepfake ? 'Deepfake detected! Review results below.' : 'Media appears authentic.',
-    isDeepfake ? 'error' : 'success'
-  );
+    // Render Results
+    resultSection.hidden = false;
+    const isDeepfake = data.is_deepfake;
+    const confidence = data.confidence || 0;
+
+    resultBadge.textContent = isDeepfake ? '⚠ Deepfake Detected' : '✓ Authentic Media';
+    resultBadge.className = 'result-badge ' + (isDeepfake ? 'deepfake' : 'authentic');
+
+    // Populate confidence bar
+    confidenceWrap.hidden = false;
+    requestAnimationFrame(() => {
+      confidenceFill.style.width = `${confidence}%`;
+      confValue.textContent = `${confidence.toFixed(1)}%`;
+    });
+
+    if (isVideo) {
+      // Video layout
+      if (vizSwitcher) vizSwitcher.hidden = true;
+      if (camExplanation) camExplanation.hidden = true;
+
+      if (videoStatsGrid) {
+        videoStatsGrid.hidden = false;
+        document.getElementById('vstat-total').textContent = data.total_frames || '—';
+        document.getElementById('vstat-analyzed').textContent = data.frames_analyzed || '—';
+        document.getElementById('vstat-fake').textContent = `${data.fake_frames || 0} (${data.fake_pct || 0}%)`;
+        document.getElementById('vstat-real').textContent = `${data.real_frames || 0} (${data.real_pct || 0}%)`;
+      }
+
+      previewContainer.innerHTML = '';
+      const vid = document.createElement('video');
+      vid.src = data.video_url || currentPreviewUrl;
+      vid.controls = true;
+      vid.autoplay = false;
+      previewContainer.appendChild(vid);
+
+    } else {
+      // Image layout
+      if (videoStatsGrid) videoStatsGrid.hidden = true;
+
+      currentViz.original = currentPreviewUrl;
+      currentViz.face = data.face_crop;
+      currentViz.cam = data.grad_cam;
+
+      if (vizSwitcher) {
+        vizSwitcher.hidden = false;
+        vizSwitcher.querySelectorAll('.viz-btn').forEach(b => b.classList.remove('active'));
+        const defaultTab = currentViz.cam ? 'cam' : 'original';
+        const defaultBtn = vizSwitcher.querySelector(`.viz-btn[data-view="${defaultTab}"]`);
+        if (defaultBtn) defaultBtn.classList.add('active');
+        showVisualizationView(defaultTab);
+      } else {
+        showVisualizationView('original');
+      }
+    }
+
+    // Populate details table
+    document.getElementById('detail-model').textContent = data.model_name || 'InceptionResnetV1';
+    const devEl = document.getElementById('detail-device');
+    if (devEl) devEl.textContent = backendDeviceInfo.toUpperCase();
+    document.getElementById('detail-time').textContent = `${data.processing_time} s`;
+    document.getElementById('detail-type').textContent = selectedFile.type || 'Media File';
+    document.getElementById('detail-res').textContent = data.resolution || '—';
+
+    const settingsDetail = document.getElementById('detail-settings');
+    if (settingsDetail) {
+      if (isVideo) {
+        settingsDetail.textContent = `Thresh: ${threshold} | Skip: ${frameSkip} | Temporal: ${useTemporal ? 'ON' : 'OFF'}`;
+      } else {
+        settingsDetail.textContent = `Thresh: ${threshold} | TTA: ${useTta ? 'ON' : 'OFF'}`;
+      }
+    }
+
+    resultDetails.hidden = false;
+    downloadReport.hidden = false;
+
+    resultSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    showToast(
+      isDeepfake ? 'Analysis complete: Synthetic manipulation detected!' : 'Analysis complete: Media appears authentic.',
+      isDeepfake ? 'error' : 'success',
+      4000
+    );
+
+  } catch (err) {
+    console.error('Detection failed:', err);
+    showToast(`Analysis failed: ${err.message || 'Could not communicate with AI backend.'}`, 'error', 5000);
+  } finally {
+    btnText.textContent = 'Analyse Media';
+    btnLoader.hidden = true;
+    detectBtn.disabled = false;
+  }
 });
 
-// Download report (placeholder)
+// ---------- Download Forensic Report ----------
 downloadReport.addEventListener('click', () => {
-  showToast('Report download will be available with backend integration', 'info');
+  if (!lastAnalysisResult) {
+    showToast('No analysis result available to export', 'info');
+    return;
+  }
+
+  const report = {
+    report_title: "Deepfake Detection Forensic Report",
+    generated_at: new Date().toISOString(),
+    media_information: {
+      filename: lastAnalysisResult.fileName,
+      file_size_bytes: lastAnalysisResult.fileSize,
+      file_type: lastAnalysisResult.fileType,
+      resolution: lastAnalysisResult.resolution
+    },
+    detection_verdict: {
+      verdict: lastAnalysisResult.label || lastAnalysisResult.verdict,
+      is_deepfake: lastAnalysisResult.is_deepfake,
+      confidence_score: `${lastAnalysisResult.confidence}%`,
+      decision_threshold: lastAnalysisResult.threshold
+    },
+    model_metadata: {
+      architecture: lastAnalysisResult.model_name,
+      processing_time_seconds: lastAnalysisResult.processing_time,
+      inference_device: backendDeviceInfo
+    },
+    frame_statistics: lastAnalysisResult.total_frames ? {
+      total_frames: lastAnalysisResult.total_frames,
+      frames_analyzed: lastAnalysisResult.frames_analyzed,
+      fake_frames: lastAnalysisResult.fake_frames,
+      real_frames: lastAnalysisResult.real_frames,
+      fake_percentage: `${lastAnalysisResult.fake_pct}%`,
+      real_percentage: `${lastAnalysisResult.real_pct}%`
+    } : null
+  };
+
+  const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Deepfake_Analysis_${Date.now()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Forensic report downloaded successfully!', 'success', 2500);
 });
 
 // Initialise
 resetResult();
 detectBtn.disabled = true;
+

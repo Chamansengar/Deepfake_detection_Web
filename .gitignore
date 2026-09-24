@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*$py.class
+runs/
+checkpoints/
+.venv/
+env/
+venv/
+*.tmp

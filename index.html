@@ -128,6 +128,12 @@
     <section class="upload-section" id="upload">
         <h2 class="section-title">Upload &amp; <span class="gradient-text">Detect</span></h2>
         <div class="upload-card glass-card">
+            <!-- Engine Status Badge -->
+            <div class="engine-status" id="engine-status">
+                <span class="status-dot"></span>
+                <span id="engine-status-text">Connecting to AI Engine...</span>
+            </div>
+
             <div class="upload-tabs">
                 <button class="tab active" data-tab="image">&#128247; Image</button>
                 <button class="tab" data-tab="video">&#127909; Video</button>
@@ -136,7 +142,7 @@
                 <div class="upload-icon">&#128228;</div>
                 <p class="upload-main-text">Drag &amp; drop your file here</p>
                 <p class="upload-sub-text">or click to browse &middot; Max 50 MB</p>
-                <input type="file" id="file-input" accept="image/*,video/*" />
+                <input type="file" id="file-input" accept="image/*" />
             </div>
             <div class="file-info" id="file-info" hidden>
                 <div class="file-details">
@@ -148,6 +154,56 @@
                 </div>
                 <button class="remove-file" id="remove-file">&times;</button>
             </div>
+
+            <!-- Advanced Detection Settings -->
+            <div class="settings-panel" id="settings-panel">
+                <div class="settings-header" id="settings-toggle">
+                    <span>&#9881; Detection Settings</span>
+                    <span class="settings-chevron" id="settings-chevron">&#9660;</span>
+                </div>
+                <div class="settings-body" id="settings-body">
+                    <!-- Threshold Slider -->
+                    <div class="setting-item">
+                        <div class="setting-label-row">
+                            <label for="param-threshold">Decision Threshold</label>
+                            <span class="setting-val" id="threshold-val">0.50</span>
+                        </div>
+                        <input type="range" id="param-threshold" min="0.10" max="0.90" step="0.05" value="0.50" />
+                        <span class="setting-hint">Lower = sensitive to fakes; Higher = conservative</span>
+                    </div>
+
+                    <!-- Test-Time Augmentation Toggle -->
+                    <div class="setting-item setting-checkbox">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="param-tta" checked />
+                            <span class="checkmark"></span>
+                            <span>Test-Time Augmentation (TTA)</span>
+                        </label>
+                        <span class="setting-hint">Averages original + horizontal flip for higher accuracy</span>
+                    </div>
+
+                    <!-- Video Frame Skip (Video Mode Only) -->
+                    <div class="setting-item" id="frameskip-wrapper" hidden>
+                        <div class="setting-label-row">
+                            <label for="param-frameskip">Frame Skip</label>
+                            <span class="setting-val" id="frameskip-val">5</span>
+                        </div>
+                        <input type="range" id="param-frameskip" min="1" max="25" step="1" value="5" />
+                        <span class="setting-hint">Analyzes every N-th frame (lower = thorough, higher = faster)</span>
+                    </div>
+
+                    <!-- Temporal Model (Video Mode Only) -->
+                    <div class="setting-item setting-checkbox" id="temporal-wrapper" hidden>
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="param-temporal" />
+                            <span class="checkmark"></span>
+                            <span id="temporal-label-text">Temporal Sequence Model (Transformer)</span>
+                        </label>
+                        <span class="setting-hint" id="temporal-hint">Analyzes temporal coherence across frames</span>
+                    </div>
+                </div>
+            </div>
+
             <button class="detect-btn" id="detect-btn" disabled>
                 <span class="btn-text">Analyse Media</span>
                 <span class="btn-loader" hidden></span>
@@ -157,20 +213,58 @@
         <!-- Result -->
         <div class="result-card glass-card" id="result-section" hidden>
             <h3>Analysis Result</h3>
+
+            <!-- Image Visualization Switcher -->
+            <div class="viz-switcher" id="viz-switcher" hidden>
+                <button class="viz-btn active" data-view="original">Original</button>
+                <button class="viz-btn" data-view="face">Face Crop</button>
+                <button class="viz-btn" data-view="cam">Grad-CAM Heatmap</button>
+            </div>
+
             <div id="preview-container"></div>
+
+            <p class="cam-explanation" id="cam-explanation" hidden>
+                <strong>Grad-CAM Explainability:</strong> Warmer red &amp; orange regions highlight where the neural network detected manipulation artifacts or unnatural facial blend boundaries.
+            </p>
+
+            <!-- Video Breakdown Metrics -->
+            <div class="video-stats-grid" id="video-stats-grid" hidden>
+                <div class="vstat">
+                    <span class="vstat-num" id="vstat-total">0</span>
+                    <span class="vstat-lbl">Total Frames</span>
+                </div>
+                <div class="vstat">
+                    <span class="vstat-num" id="vstat-analyzed">0</span>
+                    <span class="vstat-lbl">Analyzed</span>
+                </div>
+                <div class="vstat vstat-fake">
+                    <span class="vstat-num" id="vstat-fake">0</span>
+                    <span class="vstat-lbl">Fake Frames</span>
+                </div>
+                <div class="vstat vstat-real">
+                    <span class="vstat-num" id="vstat-real">0</span>
+                    <span class="vstat-lbl">Real Frames</span>
+                </div>
+            </div>
+
             <div class="result-badge" id="result-badge"></div>
+
             <div class="confidence-bar-wrap" id="confidence-wrap" hidden>
                 <span class="conf-label">Confidence</span>
                 <div class="confidence-track"><div class="confidence-fill" id="confidence-fill"></div></div>
                 <span class="conf-value" id="conf-value">0%</span>
             </div>
+
             <div class="result-details" id="result-details" hidden>
-                <div class="detail-row"><span>Model Used</span><span id="detail-model">EfficientNet-B7</span></div>
+                <div class="detail-row"><span>Model Used</span><span id="detail-model">InceptionResnetV1</span></div>
+                <div class="detail-row"><span>Inference Device</span><span id="detail-device">—</span></div>
                 <div class="detail-row"><span>Processing Time</span><span id="detail-time">—</span></div>
                 <div class="detail-row"><span>File Type</span><span id="detail-type">—</span></div>
                 <div class="detail-row"><span>Resolution</span><span id="detail-res">—</span></div>
+                <div class="detail-row" id="row-threshold"><span>Threshold / TTA</span><span id="detail-settings">—</span></div>
             </div>
-            <button class="download-report-btn" id="download-report" hidden>&#128196; Download Report</button>
+
+            <button class="download-report-btn" id="download-report" hidden>&#128196; Download Forensic Report</button>
         </div>
     </section>
 
