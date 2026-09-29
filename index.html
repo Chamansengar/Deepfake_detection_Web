@@ -49,9 +49,9 @@
     <!-- ========== Hero ========== -->
     <header class="hero" id="hero">
         <div class="hero-content">
-            <p class="hero-tag">AI-Powered Media Analysis</p>
+            <p class="hero-tag">AI-Powered Multi-Modal Analysis</p>
             <h1 class="hero-title">Deepfake Detection<br><span class="gradient-text">using AI</span></h1>
-            <p class="hero-sub">Upload any image or video and let our advanced deep-learning models determine if it's authentic or synthetically generated — in seconds.</p>
+            <p class="hero-sub">Upload any image, video, or voice recording and let our advanced deep-learning models determine if it's authentic or synthetically generated — in seconds.</p>
             <div class="hero-buttons">
                 <a href="#upload" class="hero-cta">Start Detecting &darr;</a>
                 <a href="#how-it-works" class="hero-cta-secondary">Learn More</a>
@@ -62,7 +62,9 @@
                 <span class="format-badge">WEBP</span>
                 <span class="format-badge">MP4</span>
                 <span class="format-badge">AVI</span>
-                <span class="format-badge">MOV</span>
+                <span class="format-badge">WAV</span>
+                <span class="format-badge">MP3</span>
+                <span class="format-badge">M4A</span>
             </div>
         </div>
     </header>
@@ -117,9 +119,14 @@
                 <p>Ensemble of CNN, transformer, and frequency-domain models for maximum accuracy.</p>
             </div>
             <div class="feature-card">
+                <div class="feature-icon">&#127897;</div>
+                <h3>Voice &amp; Audio Forensics</h3>
+                <p>Wav2Vec2 self-supervised speech transformer + pitch micro-jitter and vocoder spectral cutoff analysis.</p>
+            </div>
+            <div class="feature-card">
                 <div class="feature-icon">&#128202;</div>
-                <h3>Detailed Reports</h3>
-                <p>Heatmaps highlighting manipulated regions with per-frame analysis breakdowns.</p>
+                <h3>Detailed Forensic Reports</h3>
+                <p>Grad-CAM visual heatmaps, mel-spectrograms, and frame-by-frame risk breakdowns.</p>
             </div>
         </div>
     </section>
@@ -137,11 +144,13 @@
             <div class="upload-tabs">
                 <button class="tab active" data-tab="image">&#128247; Image</button>
                 <button class="tab" data-tab="video">&#127909; Video</button>
+                <button class="tab" data-tab="audio">&#127897; Voice / Audio</button>
             </div>
+
             <div class="upload-area" id="upload-area">
-                <div class="upload-icon">&#128228;</div>
-                <p class="upload-main-text">Drag &amp; drop your file here</p>
-                <p class="upload-sub-text">or click to browse &middot; Max 50 MB</p>
+                <div class="upload-icon" id="upload-icon">&#128228;</div>
+                <p class="upload-main-text" id="upload-main-text">Drag &amp; drop your file here</p>
+                <p class="upload-sub-text" id="upload-sub-text">or click to browse &middot; Max 50 MB</p>
                 <input type="file" id="file-input" accept="image/*" />
             </div>
             <div class="file-info" id="file-info" hidden>
@@ -173,7 +182,7 @@
                     </div>
 
                     <!-- Test-Time Augmentation Toggle -->
-                    <div class="setting-item setting-checkbox">
+                    <div class="setting-item setting-checkbox" id="tta-wrapper">
                         <label class="checkbox-container">
                             <input type="checkbox" id="param-tta" checked />
                             <span class="checkmark"></span>
@@ -200,6 +209,16 @@
                             <span id="temporal-label-text">Temporal Sequence Model (Transformer)</span>
                         </label>
                         <span class="setting-hint" id="temporal-hint">Analyzes temporal coherence across frames</span>
+                    </div>
+
+                    <!-- Audio Chunk Duration (Audio Mode Only) -->
+                    <div class="setting-item" id="audio-chunk-wrapper" hidden>
+                        <div class="setting-label-row">
+                            <label for="param-chunk">Temporal Window Chunk</label>
+                            <span class="setting-val" id="chunk-val">3.5 s</span>
+                        </div>
+                        <input type="range" id="param-chunk" min="1.5" max="6.0" step="0.5" value="3.5" />
+                        <span class="setting-hint">Overlapping window size used to scan and detect spliced synthetic speech segments</span>
                     </div>
                 </div>
             </div>
@@ -245,6 +264,94 @@
                     <span class="vstat-num" id="vstat-real">0</span>
                     <span class="vstat-lbl">Real Frames</span>
                 </div>
+            </div>
+
+            <!-- Audio Player Container (Audio Mode) -->
+            <div class="audio-player-wrapper" id="audio-player-wrapper" hidden>
+                <div class="audio-track-info">
+                    <span class="audio-wave-icon">&#127911;</span>
+                    <span id="audio-track-name">Uploaded Voice Sample</span>
+                </div>
+                <audio id="audio-player" controls preload="metadata"></audio>
+            </div>
+
+            <!-- Audio Dual-Probability Bar (Synthetic vs Authentic) -->
+            <div class="audio-prob-container" id="audio-prob-container" hidden>
+                <div class="prob-header">
+                    <span>Voice Authenticity Distribution</span>
+                    <span class="prob-tag">Wav2Vec2 Speech Transformer</span>
+                </div>
+                <div class="prob-bars">
+                    <div class="prob-bar-group">
+                        <div class="prob-bar-label">
+                            <span>Synthetic / Fake Voice</span>
+                            <span class="prob-pct fake-pct" id="audio-fake-pct">0%</span>
+                        </div>
+                        <div class="prob-track">
+                            <div class="prob-fill fake-fill" id="audio-fake-fill"></div>
+                        </div>
+                    </div>
+                    <div class="prob-bar-group">
+                        <div class="prob-bar-label">
+                            <span>Authentic / Real Voice</span>
+                            <span class="prob-pct real-pct" id="audio-real-pct">0%</span>
+                        </div>
+                        <div class="prob-track">
+                            <div class="prob-fill real-fill" id="audio-real-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audio Spectrogram & Pitch Plot Visualization -->
+            <div class="audio-plot-container" id="audio-plot-container" hidden>
+                <div class="plot-header">
+                    <h4>&#128200; Mel-Spectrogram &amp; Pitch Jitter Timeline</h4>
+                    <span class="plot-hint">Multi-domain Acoustic Explainability</span>
+                </div>
+                <div class="plot-img-wrap">
+                    <img id="audio-plot-img" alt="Mel-Spectrogram & Pitch Jitter Analysis" />
+                </div>
+            </div>
+
+            <!-- Audio Forensic Indicators Grid -->
+            <div class="forensic-grid" id="forensic-grid" hidden>
+                <div class="f-card">
+                    <span class="f-label">Mean Pitch (F0)</span>
+                    <span class="f-val" id="f-f0">—</span>
+                    <span class="f-sub" id="f-f0-sub">Speech Frequency</span>
+                </div>
+                <div class="f-card">
+                    <span class="f-label">Pitch Micro-Jitter</span>
+                    <span class="f-val" id="f-jitter">—</span>
+                    <span class="f-sub" id="f-jitter-sub">Biomechanical Fluctuation</span>
+                </div>
+                <div class="f-card">
+                    <span class="f-label">High-Freq Energy (>6.5kHz)</span>
+                    <span class="f-val" id="f-hf">—</span>
+                    <span class="f-sub" id="f-hf-sub">Vocoder Bandwidth Cutoff</span>
+                </div>
+                <div class="f-card">
+                    <span class="f-label">Spectral Centroid</span>
+                    <span class="f-val" id="f-centroid">—</span>
+                    <span class="f-sub">Timbre Brightness</span>
+                </div>
+                <div class="f-card">
+                    <span class="f-label">Silence / Pause Ratio</span>
+                    <span class="f-val" id="f-silence">—</span>
+                    <span class="f-sub">Noise Floor Continuity</span>
+                </div>
+                <div class="f-card">
+                    <span class="f-label">Spliced Segments Flagged</span>
+                    <span class="f-val" id="f-segments">—</span>
+                    <span class="f-sub" id="f-segments-sub">Temporal Window Scan</span>
+                </div>
+            </div>
+
+            <!-- Audio Spliced Chunks Breakdown -->
+            <div class="segments-breakdown" id="segments-breakdown" hidden>
+                <h4 class="segments-title">&#128336; Segment-by-Segment Risk Timeline</h4>
+                <div class="segments-list" id="segments-list"></div>
             </div>
 
             <div class="result-badge" id="result-badge"></div>

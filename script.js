@@ -137,7 +137,8 @@ async function checkBackendStatus() {
       temporalAvailable = Boolean(data.temporal_model_available);
 
       const ckptStatus = data.checkpoint && data.checkpoint.loaded ? 'Fine-tuned' : 'Pretrained';
-      engineStatusText.textContent = `AI Engine Online (${data.model} · ${ckptStatus} · ${backendDeviceInfo})`;
+      const audioStatus = data.audio_model_available ? ' · Audio Active' : '';
+      engineStatusText.textContent = `AI Engine Online (${data.model} · ${ckptStatus}${audioStatus} · ${backendDeviceInfo})`;
 
       // Enable temporal toggle if backend has it
       const tempWrapper = document.getElementById('temporal-wrapper');
@@ -165,6 +166,11 @@ checkBackendStatus();
 // ---------- Upload tabs & Settings Mode ----------
 const frameskipWrapper = document.getElementById('frameskip-wrapper');
 const temporalWrapper = document.getElementById('temporal-wrapper');
+const ttaWrapper = document.getElementById('tta-wrapper');
+const audioChunkWrapper = document.getElementById('audio-chunk-wrapper');
+const uploadIcon = document.getElementById('upload-icon');
+const uploadMainText = document.getElementById('upload-main-text');
+const uploadSubText = document.getElementById('upload-sub-text');
 let currentMode = 'image';
 
 document.querySelectorAll('.tab').forEach(tab => {
@@ -173,10 +179,35 @@ document.querySelectorAll('.tab').forEach(tab => {
     tab.classList.add('active');
     currentMode = tab.dataset.tab;
     const fileInput = document.getElementById('file-input');
-    fileInput.accept = currentMode === 'video' ? 'video/*' : 'image/*';
 
-    if (frameskipWrapper) frameskipWrapper.hidden = (currentMode !== 'video');
-    if (temporalWrapper) temporalWrapper.hidden = (currentMode !== 'video');
+    if (currentMode === 'audio') {
+      fileInput.accept = 'audio/*, .wav, .mp3, .m4a, .flac, .ogg, .webm, .opus, .aac';
+      if (frameskipWrapper) frameskipWrapper.hidden = true;
+      if (temporalWrapper) temporalWrapper.hidden = true;
+      if (ttaWrapper) ttaWrapper.hidden = true;
+      if (audioChunkWrapper) audioChunkWrapper.hidden = false;
+      if (uploadIcon) uploadIcon.textContent = '🎙️';
+      if (uploadMainText) uploadMainText.textContent = 'Drag & drop voice or audio file here';
+      if (uploadSubText) uploadSubText.textContent = 'Supports WAV, MP3, M4A, FLAC, OGG, WEBM · Max 50 MB';
+    } else if (currentMode === 'video') {
+      fileInput.accept = 'video/*';
+      if (frameskipWrapper) frameskipWrapper.hidden = false;
+      if (temporalWrapper) temporalWrapper.hidden = false;
+      if (ttaWrapper) ttaWrapper.hidden = false;
+      if (audioChunkWrapper) audioChunkWrapper.hidden = true;
+      if (uploadIcon) uploadIcon.textContent = '📁';
+      if (uploadMainText) uploadMainText.textContent = 'Drag & drop your video file here';
+      if (uploadSubText) uploadSubText.textContent = 'Supports MP4, AVI, MOV, MKV, WEBM · Max 50 MB';
+    } else {
+      fileInput.accept = 'image/*';
+      if (frameskipWrapper) frameskipWrapper.hidden = true;
+      if (temporalWrapper) temporalWrapper.hidden = true;
+      if (ttaWrapper) ttaWrapper.hidden = false;
+      if (audioChunkWrapper) audioChunkWrapper.hidden = true;
+      if (uploadIcon) uploadIcon.textContent = '📤';
+      if (uploadMainText) uploadMainText.textContent = 'Drag & drop your image file here';
+      if (uploadSubText) uploadSubText.textContent = 'Supports JPG, PNG, WEBP, BMP · Max 50 MB';
+    }
 
     clearFile();
     showToast(`Switched to ${currentMode} detection mode`, 'info', 2000);
@@ -205,6 +236,14 @@ const frameskipVal = document.getElementById('frameskip-val');
 if (paramFrameskip && frameskipVal) {
   paramFrameskip.addEventListener('input', e => {
     frameskipVal.textContent = e.target.value;
+  });
+}
+
+const paramChunk = document.getElementById('param-chunk');
+const chunkVal = document.getElementById('chunk-val');
+if (paramChunk && chunkVal) {
+  paramChunk.addEventListener('input', e => {
+    chunkVal.textContent = parseFloat(e.target.value).toFixed(1) + ' s';
   });
 }
 
@@ -279,6 +318,21 @@ const vizSwitcher = document.getElementById('viz-switcher');
 const camExplanation = document.getElementById('cam-explanation');
 const videoStatsGrid = document.getElementById('video-stats-grid');
 
+// Voice / Audio UI Elements
+const audioPlayerWrapper = document.getElementById('audio-player-wrapper');
+const audioPlayer = document.getElementById('audio-player');
+const audioTrackName = document.getElementById('audio-track-name');
+const audioProbContainer = document.getElementById('audio-prob-container');
+const audioFakePct = document.getElementById('audio-fake-pct');
+const audioFakeFill = document.getElementById('audio-fake-fill');
+const audioRealPct = document.getElementById('audio-real-pct');
+const audioRealFill = document.getElementById('audio-real-fill');
+const audioPlotContainer = document.getElementById('audio-plot-container');
+const audioPlotImg = document.getElementById('audio-plot-img');
+const forensicGrid = document.getElementById('forensic-grid');
+const segmentsBreakdown = document.getElementById('segments-breakdown');
+const segmentsList = document.getElementById('segments-list');
+
 let selectedFile = null;
 let currentPreviewUrl = null;
 let currentViz = { original: null, face: null, cam: null };
@@ -303,6 +357,19 @@ function resetResult() {
   if (vizSwitcher) vizSwitcher.hidden = true;
   if (camExplanation) camExplanation.hidden = true;
   if (videoStatsGrid) videoStatsGrid.hidden = true;
+
+  if (audioPlayerWrapper) {
+    audioPlayerWrapper.hidden = true;
+    if (audioPlayer) {
+      audioPlayer.pause();
+      audioPlayer.src = '';
+    }
+  }
+  if (audioProbContainer) audioProbContainer.hidden = true;
+  if (audioPlotContainer) audioPlotContainer.hidden = true;
+  if (forensicGrid) forensicGrid.hidden = true;
+  if (segmentsBreakdown) segmentsBreakdown.hidden = true;
+
   currentViz = { original: null, face: null, cam: null };
   lastAnalysisResult = null;
 }
@@ -310,7 +377,13 @@ function resetResult() {
 function showFileInfo(file) {
   fileNameEl.textContent = file.name;
   fileSizeEl.textContent = formatBytes(file.size);
-  fileTypeIcon.textContent = file.type.startsWith('video') ? '🎬' : '🖼️';
+  if (file.type.startsWith('video')) {
+    fileTypeIcon.textContent = '🎬';
+  } else if (file.type.startsWith('audio') || file.name.match(/\.(wav|mp3|m4a|flac|ogg|webm|opus|aac)$/i)) {
+    fileTypeIcon.textContent = '🎙️';
+  } else {
+    fileTypeIcon.textContent = '🖼️';
+  }
   fileInfo.hidden = false;
 }
 
@@ -342,9 +415,11 @@ function handleFile(file) {
     showToast('File exceeds 50 MB limit', 'error');
     return;
   }
-  // Auto-switch tab if user dropped video into image tab or vice-versa
+  // Auto-switch tab if user dropped video or audio into mismatched tab
   if (file.type.startsWith('video') && currentMode !== 'video') {
     document.querySelector('.tab[data-tab="video"]').click();
+  } else if ((file.type.startsWith('audio') || file.name.match(/\.(wav|mp3|m4a|flac|ogg|webm|opus|aac)$/i)) && currentMode !== 'audio') {
+    document.querySelector('.tab[data-tab="audio"]').click();
   } else if (file.type.startsWith('image') && currentMode !== 'image') {
     document.querySelector('.tab[data-tab="image"]').click();
   }
@@ -397,20 +472,28 @@ detectBtn.addEventListener('click', async () => {
   const useTta = document.getElementById('param-tta') ? document.getElementById('param-tta').checked : true;
   const frameSkip = parseInt(paramFrameskip ? paramFrameskip.value : 5);
   const useTemporal = document.getElementById('param-temporal') ? document.getElementById('param-temporal').checked : false;
+  const chunkDuration = parseFloat(paramChunk ? paramChunk.value : 3.5);
 
-  const isVideo = selectedFile.type.startsWith('video') || currentMode === 'video';
+  const isAudio = selectedFile.type.startsWith('audio') || selectedFile.name.match(/\.(wav|mp3|m4a|flac|ogg|webm|opus|aac)$/i) || currentMode === 'audio';
+  const isVideo = !isAudio && (selectedFile.type.startsWith('video') || currentMode === 'video');
 
   const formData = new FormData();
   formData.append('file', selectedFile);
   formData.append('threshold', threshold);
-  formData.append('use_tta', useTta);
 
-  if (isVideo) {
+  let endpoint = '/api/detect-image';
+  if (isAudio) {
+    formData.append('chunk_duration', chunkDuration);
+    endpoint = '/api/detect-audio';
+  } else if (isVideo) {
     formData.append('frame_skip', frameSkip);
     formData.append('use_temporal', useTemporal);
+    formData.append('use_tta', useTta);
+    endpoint = '/api/detect-video';
+  } else {
+    formData.append('use_tta', useTta);
+    endpoint = '/api/detect-image';
   }
-
-  const endpoint = isVideo ? '/api/detect-video' : '/api/detect-image';
 
   try {
     const response = await fetch(endpoint, {
@@ -424,7 +507,7 @@ detectBtn.addEventListener('click', async () => {
     }
 
     const data = await response.json();
-    lastAnalysisResult = { ...data, fileName: selectedFile.name, fileSize: selectedFile.size, fileType: selectedFile.type };
+    lastAnalysisResult = { ...data, fileName: selectedFile.name, fileSize: selectedFile.size, fileType: selectedFile.type, isAudio: isAudio, isVideo: isVideo };
 
     if (!data.success) {
       showToast(data.message || 'Detection could not be completed.', 'error', 4500);
@@ -449,10 +532,95 @@ detectBtn.addEventListener('click', async () => {
       confValue.textContent = `${confidence.toFixed(1)}%`;
     });
 
-    if (isVideo) {
+    if (isAudio) {
+      // Audio layout
+      if (vizSwitcher) vizSwitcher.hidden = true;
+      if (camExplanation) camExplanation.hidden = true;
+      if (videoStatsGrid) videoStatsGrid.hidden = true;
+      previewContainer.innerHTML = '';
+
+      // 1. Audio Player
+      if (audioPlayerWrapper) {
+        audioPlayerWrapper.hidden = false;
+        if (audioTrackName) audioTrackName.textContent = selectedFile.name;
+        if (audioPlayer) {
+          audioPlayer.src = currentPreviewUrl;
+          audioPlayer.load();
+        }
+      }
+
+      // 2. Dual Probability Distribution
+      if (audioProbContainer) {
+        audioProbContainer.hidden = false;
+        const fakeProb = data.fake_prob !== undefined ? data.fake_prob : (isDeepfake ? confidence : (100 - confidence));
+        const realProb = data.real_prob !== undefined ? data.real_prob : (100 - fakeProb);
+
+        if (audioFakePct) audioFakePct.textContent = `${fakeProb.toFixed(1)}%`;
+        if (audioRealPct) audioRealPct.textContent = `${realProb.toFixed(1)}%`;
+        if (audioFakeFill) audioFakeFill.style.width = `${fakeProb}%`;
+        if (audioRealFill) audioRealFill.style.width = `${realProb}%`;
+      }
+
+      // 3. Mel-Spectrogram & Pitch Jitter Explainability Plot
+      if (audioPlotContainer && data.plot_image) {
+        audioPlotContainer.hidden = false;
+        if (audioPlotImg) audioPlotImg.src = data.plot_image;
+      } else if (audioPlotContainer) {
+        audioPlotContainer.hidden = true;
+      }
+
+      // 4. Acoustic Forensic Indicators
+      if (forensicGrid && data.forensic_metrics) {
+        forensicGrid.hidden = false;
+        const fm = data.forensic_metrics;
+        const f0El = document.getElementById('f-f0');
+        const jitterEl = document.getElementById('f-jitter');
+        const hfEl = document.getElementById('f-hf');
+        const centroidEl = document.getElementById('f-centroid');
+        const silenceEl = document.getElementById('f-silence');
+        const segmentsEl = document.getElementById('f-segments');
+
+        if (f0El) f0El.textContent = `${fm.mean_f0_hz || 0} Hz`;
+        if (jitterEl) jitterEl.textContent = `${fm.jitter_percent || 0}%`;
+        if (hfEl) hfEl.textContent = `${((fm.hf_energy_ratio || 0) * 100).toFixed(2)}%`;
+        if (centroidEl) centroidEl.textContent = `${fm.spectral_centroid_hz || 0} Hz`;
+        if (silenceEl) silenceEl.textContent = `${((fm.silence_ratio || 0) * 100).toFixed(1)}%`;
+
+        const totalSegs = (data.segment_results || []).length;
+        const fakeSegs = (data.segment_results || []).filter(s => s.is_fake).length;
+        if (segmentsEl) segmentsEl.textContent = `${fakeSegs} / ${totalSegs} flagged`;
+      }
+
+      // 5. Segment Timeline Breakdown
+      if (segmentsBreakdown && data.segment_results && data.segment_results.length > 0) {
+        segmentsBreakdown.hidden = false;
+        segmentsList.innerHTML = '';
+        data.segment_results.forEach(seg => {
+          const item = document.createElement('div');
+          item.className = 'segment-item ' + (seg.is_fake ? 'is-fake' : 'is-real');
+          const timeRange = `${seg.start_time.toFixed(1)}s – ${seg.end_time.toFixed(1)}s`;
+          const score = (seg.fake_prob * 100).toFixed(1);
+          item.innerHTML = `
+            <div>
+              <strong>Segment ${seg.segment}</strong> &middot; <span class="seg-time">${timeRange}</span>
+            </div>
+            <div>
+              <span class="seg-badge ${seg.is_fake ? 'fake' : 'real'}">${seg.is_fake ? '⚠ Synthetic' : '✓ Authentic'} (${score}%)</span>
+            </div>
+          `;
+          segmentsList.appendChild(item);
+        });
+      }
+
+    } else if (isVideo) {
       // Video layout
       if (vizSwitcher) vizSwitcher.hidden = true;
       if (camExplanation) camExplanation.hidden = true;
+      if (audioPlayerWrapper) audioPlayerWrapper.hidden = true;
+      if (audioProbContainer) audioProbContainer.hidden = true;
+      if (audioPlotContainer) audioPlotContainer.hidden = true;
+      if (forensicGrid) forensicGrid.hidden = true;
+      if (segmentsBreakdown) segmentsBreakdown.hidden = true;
 
       if (videoStatsGrid) {
         videoStatsGrid.hidden = false;
@@ -472,6 +640,11 @@ detectBtn.addEventListener('click', async () => {
     } else {
       // Image layout
       if (videoStatsGrid) videoStatsGrid.hidden = true;
+      if (audioPlayerWrapper) audioPlayerWrapper.hidden = true;
+      if (audioProbContainer) audioProbContainer.hidden = true;
+      if (audioPlotContainer) audioPlotContainer.hidden = true;
+      if (forensicGrid) forensicGrid.hidden = true;
+      if (segmentsBreakdown) segmentsBreakdown.hidden = true;
 
       currentViz.original = currentPreviewUrl;
       currentViz.face = data.face_crop;
@@ -494,12 +667,14 @@ detectBtn.addEventListener('click', async () => {
     const devEl = document.getElementById('detail-device');
     if (devEl) devEl.textContent = backendDeviceInfo.toUpperCase();
     document.getElementById('detail-time').textContent = `${data.processing_time} s`;
-    document.getElementById('detail-type').textContent = selectedFile.type || 'Media File';
-    document.getElementById('detail-res').textContent = data.resolution || '—';
+    document.getElementById('detail-type').textContent = selectedFile.type || (isAudio ? 'Audio File' : 'Media File');
+    document.getElementById('detail-res').textContent = data.resolution || (isAudio ? `Window: ${chunkDuration}s` : '—');
 
     const settingsDetail = document.getElementById('detail-settings');
     if (settingsDetail) {
-      if (isVideo) {
+      if (isAudio) {
+        settingsDetail.textContent = `Thresh: ${threshold} | Chunk: ${chunkDuration}s`;
+      } else if (isVideo) {
         settingsDetail.textContent = `Thresh: ${threshold} | Skip: ${frameSkip} | Temporal: ${useTemporal ? 'ON' : 'OFF'}`;
       } else {
         settingsDetail.textContent = `Thresh: ${threshold} | TTA: ${useTta ? 'ON' : 'OFF'}`;
@@ -533,27 +708,37 @@ downloadReport.addEventListener('click', () => {
     return;
   }
 
+  const isAudio = lastAnalysisResult.isAudio;
+  const isVideo = lastAnalysisResult.isVideo;
+
   const report = {
-    report_title: "Deepfake Detection Forensic Report",
+    report_title: isAudio ? "Deepfake Voice & Speech Forensic Report" : "Deepfake Detection Forensic Report",
     generated_at: new Date().toISOString(),
     media_information: {
       filename: lastAnalysisResult.fileName,
       file_size_bytes: lastAnalysisResult.fileSize,
       file_type: lastAnalysisResult.fileType,
-      resolution: lastAnalysisResult.resolution
+      resolution: lastAnalysisResult.resolution || null
     },
     detection_verdict: {
       verdict: lastAnalysisResult.label || lastAnalysisResult.verdict,
       is_deepfake: lastAnalysisResult.is_deepfake,
       confidence_score: `${lastAnalysisResult.confidence}%`,
-      decision_threshold: lastAnalysisResult.threshold
+      decision_threshold: lastAnalysisResult.threshold,
+      fake_probability_score: lastAnalysisResult.fake_prob !== undefined ? `${lastAnalysisResult.fake_prob}%` : null,
+      real_probability_score: lastAnalysisResult.real_prob !== undefined ? `${lastAnalysisResult.real_prob}%` : null
     },
     model_metadata: {
       architecture: lastAnalysisResult.model_name,
       processing_time_seconds: lastAnalysisResult.processing_time,
       inference_device: backendDeviceInfo
     },
-    frame_statistics: lastAnalysisResult.total_frames ? {
+    acoustic_forensics: isAudio ? {
+      metrics: lastAnalysisResult.forensic_metrics,
+      segment_scan: lastAnalysisResult.segment_results,
+      forensic_summary: lastAnalysisResult.summary_text
+    } : null,
+    frame_statistics: isVideo && lastAnalysisResult.total_frames ? {
       total_frames: lastAnalysisResult.total_frames,
       frames_analyzed: lastAnalysisResult.frames_analyzed,
       fake_frames: lastAnalysisResult.fake_frames,
@@ -567,7 +752,8 @@ downloadReport.addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Deepfake_Analysis_${Date.now()}.json`;
+  const prefix = isAudio ? 'Voice_Deepfake' : 'Deepfake';
+  a.download = `${prefix}_Analysis_${Date.now()}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

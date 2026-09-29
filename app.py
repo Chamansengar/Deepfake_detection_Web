@@ -42,6 +42,16 @@ try:
 except Exception as e:
     print(f"Notice: temporal_model not imported: {e}")
 
+# Audio Deepfake Model
+audio_detector_available = False
+get_audio_detector = None
+try:
+    from audio_model import get_audio_detector
+    audio_detector_available = True
+    print("[*] Audio deepfake detector module loaded.")
+except Exception as e:
+    print(f"Notice: audio_model not imported: {e}")
+
 # Directory to hold processed output videos
 RUNS_DIR = os.path.join(BASE_DIR, 'runs')
 os.makedirs(RUNS_DIR, exist_ok=True)
@@ -258,6 +268,7 @@ async def get_status():
         "model": "InceptionResnetV1",
         "checkpoint": checkpoint_info,
         "temporal_model_available": temporal_model is not None,
+        "audio_model_available": audio_detector_available,
         "grad_cam_ready": True
     }
 
@@ -601,6 +612,88 @@ async def detect_video(
         "resolution": f"{width}x{height}",
         "fps": round(fps, 1),
         "model_name": model_name
+    }
+
+# ------------------------------------------------------------
+# Voice / Audio Deepfake Detection Endpoint
+# ------------------------------------------------------------
+@app.post("/api/detect-audio")
+async def detect_audio(
+    file: UploadFile = File(...),
+    threshold: float = Form(0.5),
+    chunk_duration: float = Form(3.5)
+):
+    if not audio_detector_available or get_audio_detector is None:
+        raise HTTPException(status_code=503, detail="Audio detection model is not available on this server.")
+
+    valid_audio_exts = ('.wav', '.mp3', '.m4a', '.flac', '.ogg', '.webm', '.aac', '.wma', '.opus')
+    is_valid_type = (file.content_type and (file.content_type.startswith("audio/") or "webm" in file.content_type or "ogg" in file.content_type)) or \
+                    (file.filename and file.filename.lower().endswith(valid_audio_exts))
+    if not is_valid_type:
+        raise HTTPException(status_code=400, detail="Uploaded file is not a supported audio format.")
+
+    start_time = time.perf_counter()
+
+    suffix = Path(file.filename).suffix or ".wav"
+    if not suffix or suffix == ".":
+        suffix = ".webm" if (file.content_type and "webm" in file.content_type) else ".wav"
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_in:
+        input_audio_path = temp_in.name
+        contents = await file.read()
+        temp_in.write(contents)
+
+    try:
+        detector = get_audio_detector()
+        result = detector.predict(
+            input_audio_path,
+            chunk_duration=chunk_duration,
+            threshold=threshold
+        )
+    except Exception as e:
+        if os.path.exists(input_audio_path):
+            os.remove(input_audio_path)
+        raise HTTPException(status_code=500, detail=f"Audio analysis error: {str(e)}")
+
+    if os.path.exists(input_audio_path):
+        os.remove(input_audio_path)
+
+    elapsed = round(time.perf_counter() - start_time, 2)
+
+    plot_b64 = None
+    if result.get("plot_image_path") and os.path.isfile(result["plot_image_path"]):
+        try:
+            with open(result["plot_image_path"], "rb") as img_f:
+                plot_data = img_f.read()
+                plot_b64 = f"data:image/png;base64,{base64.b64encode(plot_data).decode('utf-8')}"
+            try:
+                os.remove(result["plot_image_path"])
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"Notice: Failed to encode plot image: {e}")
+
+    is_fake = (result["verdict"].lower() == "fake")
+    confidence_val = float(result.get("confidence_percent", 0.0))
+    fake_prob_val = round(float(result.get("fake_prob", 0.0)) * 100, 1)
+    real_prob_val = round(float(result.get("real_prob", 0.0)) * 100, 1)
+
+    return {
+        "success": True,
+        "is_deepfake": is_fake,
+        "verdict": result["verdict"],
+        "label": "Fake" if is_fake else "Real",
+        "confidence": confidence_val,
+        "fake_prob": fake_prob_val,
+        "real_prob": real_prob_val,
+        "threshold": threshold,
+        "chunk_duration": chunk_duration,
+        "summary_text": result.get("summary_text", ""),
+        "forensic_metrics": result.get("forensic_metrics", {}),
+        "segment_results": result.get("segment_results", []),
+        "plot_image": plot_b64,
+        "processing_time": elapsed,
+        "model_name": "Wav2Vec2 Speech Transformer + Multi-Domain Acoustic Forensics"
     }
 
 # ------------------------------------------------------------
