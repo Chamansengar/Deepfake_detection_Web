@@ -3,11 +3,23 @@ Write-Host "========================================================" -Foregroun
 Write-Host " Starting Deepfake Detection Web Application (FastAPI)" -ForegroundColor Green
 Write-Host "========================================================" -ForegroundColor Cyan
 
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (-not $scriptDir) { $scriptDir = $PSScriptRoot }
+if (-not $scriptDir) { $scriptDir = "." }
+
 $pythonExe = "python"
-if (Test-Path "..\Ai model\.venv\Scripts\python.exe") {
-    $pythonExe = "..\Ai model\.venv\Scripts\python.exe"
-} elseif (Test-Path ".venv\Scripts\python.exe") {
-    $pythonExe = ".venv\Scripts\python.exe"
+$candidatePaths = @(
+    (Join-Path $scriptDir "..\Ai model\.venv\Scripts\python.exe"),
+    (Join-Path $scriptDir ".venv\Scripts\python.exe"),
+    "..\Ai model\.venv\Scripts\python.exe",
+    ".venv\Scripts\python.exe"
+)
+
+foreach ($path in $candidatePaths) {
+    if (Test-Path $path) {
+        $pythonExe = (Resolve-Path $path).Path
+        break
+    }
 }
 
 Write-Host "Using Python: $pythonExe" -ForegroundColor Yellow

@@ -862,6 +862,11 @@ detectBtn.addEventListener('click', async () => {
       vid.src = data.video_url || currentPreviewUrl;
       vid.controls = true;
       vid.autoplay = false;
+      vid.onerror = () => {
+        if (currentPreviewUrl && vid.src !== currentPreviewUrl) {
+          vid.src = currentPreviewUrl;
+        }
+      };
       previewContainer.appendChild(vid);
 
     } else {

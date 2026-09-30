@@ -701,7 +701,8 @@ async def detect_audio(
 # ------------------------------------------------------------
 @app.get("/api/video-results/{filename}")
 async def get_video_result(filename: str):
-    video_file = os.path.join(RUNS_DIR, filename)
+    clean_filename = os.path.basename(filename)
+    video_file = os.path.join(RUNS_DIR, clean_filename)
     if not os.path.isfile(video_file):
         raise HTTPException(status_code=404, detail="Processed video not found.")
     return FileResponse(video_file, media_type="video/mp4")
@@ -728,6 +729,8 @@ app.mount("/", StaticFiles(directory=BASE_DIR, html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
+    if BASE_DIR not in sys.path:
+        sys.path.insert(0, BASE_DIR)
     print("\n==================================================")
     print("🚀 Deepfake Detection Web Application Starting")
     print(f"👉 Local URL: http://127.0.0.1:8000")
