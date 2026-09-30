@@ -313,6 +313,7 @@ const statsObserver = new IntersectionObserver((entries, obs) => {
 statsObserver.observe(document.querySelector('.stats-bar'));
 
 // ---------- Backend Connection & Status Check ----------
+const API_BASE = window.DEEPFAKE_API_URL || localStorage.getItem('deepfake_api_url') || '';
 const engineStatus = document.getElementById('engine-status');
 const engineStatusText = document.getElementById('engine-status-text');
 let backendDeviceInfo = 'CPU';
@@ -320,7 +321,7 @@ let temporalAvailable = false;
 
 async function checkBackendStatus() {
   try {
-    const res = await fetch('/api/status', { method: 'GET' });
+    const res = await fetch(`${API_BASE}/api/status`, { method: 'GET' });
     if (res.ok) {
       const data = await res.json();
       engineStatus.classList.add('online');
@@ -708,18 +709,18 @@ detectBtn.addEventListener('click', async () => {
   formData.append('file', selectedFile);
   formData.append('threshold', threshold);
 
-  let endpoint = '/api/detect-image';
+  let endpoint = `${API_BASE}/api/detect-image`;
   if (isAudio) {
     formData.append('chunk_duration', chunkDuration);
-    endpoint = '/api/detect-audio';
+    endpoint = `${API_BASE}/api/detect-audio`;
   } else if (isVideo) {
     formData.append('frame_skip', frameSkip);
     formData.append('use_temporal', useTemporal);
     formData.append('use_tta', useTta);
-    endpoint = '/api/detect-video';
+    endpoint = `${API_BASE}/api/detect-video`;
   } else {
     formData.append('use_tta', useTta);
-    endpoint = '/api/detect-image';
+    endpoint = `${API_BASE}/api/detect-image`;
   }
 
   try {
