@@ -29,14 +29,14 @@ let updateSpaceStarfieldColors = null;
 
   // Theme-aware Star Colors
   function getStarPalettes() {
-    const theme = document.body.dataset.theme || 'nebula';
+    const theme = document.body.dataset.theme || 'black-space';
     if (theme === 'aurora') {
       return ['#00f59b', '#00d2ff', '#38bdf8', '#ffffff', '#ffd166'];
     } else if (theme === 'void') {
       return ['#ffffff', '#c084fc', '#38bdf8', '#e2e8f0', '#a78bfa'];
     }
-    // nebula default
-    return ['#00f2fe', '#8a2be2', '#c084fc', '#ffffff', '#ff2a85'];
+    // black-space default: diamond white, starlight cyan, quantum violet, electric pink
+    return ['#ffffff', '#00f2fe', '#8a2be2', '#c084fc', '#ff2a85'];
   }
 
   let colorPalette = getStarPalettes();
@@ -486,9 +486,12 @@ const spaceThemes = [
 
 let currentThemeIdx = 0;
 const savedTheme = localStorage.getItem('deepfake_space_theme');
-if (savedTheme) {
+if (savedTheme && savedTheme !== 'nebula') {
   const foundIdx = spaceThemes.findIndex(t => t.id === savedTheme);
   if (foundIdx !== -1) currentThemeIdx = foundIdx;
+} else {
+  currentThemeIdx = 0;
+  localStorage.setItem('deepfake_space_theme', 'black-space');
 }
 
 function applySpaceTheme(index, notify = false) {

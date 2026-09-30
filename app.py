@@ -713,7 +713,14 @@ async def get_video_result(filename: str):
 async def serve_index():
     index_path = os.path.join(BASE_DIR, "index.html")
     if os.path.isfile(index_path):
-        return FileResponse(index_path)
+        return FileResponse(
+            index_path,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
     return {"message": "Deepfake Detection API is running. index.html not found."}
 
 # Mount directory to serve style.css, script.js, and static assets

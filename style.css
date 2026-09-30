@@ -117,7 +117,8 @@ html {
 
 body {
   font-family: var(--font-body);
-  background-color: var(--bg-body);
+  background-color: #000000 !important;
+  background: #000000 !important;
   color: var(--text);
   line-height: 1.65;
   overflow-x: hidden;
@@ -125,7 +126,6 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.5s ease, color 0.35s ease;
 }
 
 /* Cosmic Ambient Space Grid */
@@ -133,13 +133,13 @@ body {
   position: fixed;
   inset: 0;
   background-image: 
-    linear-gradient(rgba(0, 242, 254, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 242, 254, 0.035) 1px, transparent 1px);
+    linear-gradient(rgba(0, 242, 254, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 242, 254, 0.04) 1px, transparent 1px);
   background-size: 60px 60px;
   background-position: center center;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.65;
+  opacity: 0.35;
   mask-image: radial-gradient(circle at 50% 35%, black 20%, transparent 80%);
   -webkit-mask-image: radial-gradient(circle at 50% 35%, black 20%, transparent 80%);
 }
@@ -152,6 +152,7 @@ body {
   pointer-events: none;
   width: 100vw;
   height: 100vh;
+  background: #000000;
 }
 
 /* ---------- Glowing Deep Space Nebula Orbs ---------- */
@@ -161,43 +162,37 @@ body {
   pointer-events: none;
   z-index: 0;
   mix-blend-mode: screen;
-  filter: blur(145px);
-  opacity: 0.16;
+  filter: blur(160px);
+  opacity: 0.04;
   transition: background 0.8s ease, opacity 0.8s ease;
 }
 .orb-1 {
-  width: 580px;
-  height: 580px;
+  width: 500px;
+  height: 500px;
   top: -12%;
   left: -8%;
   background: radial-gradient(circle, var(--accent-1), transparent 70%);
   animation: orbFloat 22s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
 }
 .orb-2 {
-  width: 520px;
-  height: 520px;
+  width: 450px;
+  height: 450px;
   bottom: 8%;
   right: -6%;
   background: radial-gradient(circle, var(--accent-2), transparent 70%);
   animation: orbFloat 26s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate-reverse;
 }
 .orb-3 {
-  width: 440px;
-  height: 440px;
+  width: 380px;
+  height: 380px;
   top: 38%;
   left: 45%;
   background: radial-gradient(circle, var(--accent-3), transparent 70%);
   animation: orbFloat 18s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
-  opacity: 0.12;
+  opacity: 0.03;
 }
 .orb-nebula {
-  width: 700px;
-  height: 700px;
-  top: 60%;
-  left: -15%;
-  background: radial-gradient(circle, var(--accent-2), transparent 65%);
-  animation: orbFloat 32s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate-reverse;
-  opacity: 0.10;
+  display: none;
 }
 
 @keyframes orbFloat {
