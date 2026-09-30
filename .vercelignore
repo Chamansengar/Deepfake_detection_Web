@@ -1,0 +1,13 @@
+# Ignore Python serverless bundling on Vercel
+# This allows Vercel to deploy the fast static frontend without hitting the 500 MB Lambda limit
+requirements.txt
+requirement.txt
+app.py
+audio_model.py
+test_suite.py
+Dockerfile
+runs/
+checkpoints/
+__pycache__/
+*.py
+*.pth

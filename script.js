@@ -350,10 +350,29 @@ async function checkBackendStatus() {
     if (engineStatus) {
       engineStatus.classList.add('offline');
       engineStatus.classList.remove('online');
-      engineStatusText.textContent = 'AI Engine Offline (Run python app.py)';
+      engineStatusText.textContent = API_BASE ? `AI Backend Unreachable (${API_BASE}) · Click to change` : 'AI Engine Offline · Click to set Backend URL';
     }
   }
 }
+
+if (engineStatus) {
+  engineStatus.title = "Click to configure AI Backend URL";
+  engineStatus.style.cursor = "pointer";
+  engineStatus.addEventListener('click', () => {
+    const current = localStorage.getItem('deepfake_api_url') || '';
+    const newUrl = prompt('Enter your live Deepfake AI Backend URL (e.g. https://your-backend.onrender.com or leave blank for local server):', current);
+    if (newUrl !== null) {
+      const trimmed = newUrl.trim().replace(/\/$/, '');
+      if (trimmed) {
+        localStorage.setItem('deepfake_api_url', trimmed);
+      } else {
+        localStorage.removeItem('deepfake_api_url');
+      }
+      location.reload();
+    }
+  });
+}
+
 checkBackendStatus();
 
 // ---------- Upload tabs & Settings Mode ----------
