@@ -2,45 +2,237 @@
 // script.js – Deepfake Detection using AI · Interactive Frontend
 // ============================================================
 
-// ---------- Particle background ----------
-(function initParticles() {
+// ---------- Dynamic Space Starfield & Cosmic Engine ----------
+let updateSpaceStarfieldColors = null;
+(function initDynamicSpaceCanvas() {
   const canvas = document.getElementById('particles');
+  if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  let w, h, particles = [];
+  let w = (canvas.width = window.innerWidth);
+  let h = (canvas.height = window.innerHeight);
 
-  function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+  const mouse = { x: -9999, y: -9999, radius: 130 };
+  window.addEventListener('mousemove', e => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+  window.addEventListener('mouseleave', () => {
+    mouse.x = -9999;
+    mouse.y = -9999;
+  });
+
+  function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+  }
   window.addEventListener('resize', resize);
-  resize();
 
-  class Particle {
-    constructor() { this.reset(); }
-    reset() {
+  // Theme-aware Star Colors
+  function getStarPalettes() {
+    const theme = document.body.dataset.theme || 'nebula';
+    if (theme === 'aurora') {
+      return ['#00f59b', '#00d2ff', '#38bdf8', '#ffffff', '#ffd166'];
+    } else if (theme === 'void') {
+      return ['#ffffff', '#c084fc', '#38bdf8', '#e2e8f0', '#a78bfa'];
+    }
+    // nebula default
+    return ['#00f2fe', '#8a2be2', '#c084fc', '#ffffff', '#ff2a85'];
+  }
+
+  let colorPalette = getStarPalettes();
+  updateSpaceStarfieldColors = () => {
+    colorPalette = getStarPalettes();
+    stars.forEach(s => (s.color = colorPalette[Math.floor(Math.random() * colorPalette.length)]));
+  };
+
+  // Cosmic Star
+  class Star {
+    constructor() {
+      this.reset(true);
+    }
+    reset(initial = false) {
       this.x = Math.random() * w;
-      this.y = Math.random() * h;
-      this.r = Math.random() * 1.8 + 0.4;
-      this.dx = (Math.random() - 0.5) * 0.35;
-      this.dy = (Math.random() - 0.5) * 0.35;
-      this.alpha = Math.random() * 0.5 + 0.15;
+      this.y = initial ? Math.random() * h : Math.random() < 0.5 ? -10 : h + 10;
+      this.size = Math.random() * 2 + 0.5;
+      this.depth = Math.random() * 0.8 + 0.2; // Parallax depth
+      this.vx = (Math.random() - 0.5) * 0.25 * this.depth;
+      this.vy = (Math.random() - 0.5) * 0.25 * this.depth;
+      this.baseAlpha = Math.random() * 0.65 + 0.25;
+      this.alpha = this.baseAlpha;
+      this.twinkleSpeed = Math.random() * 0.03 + 0.01;
+      this.twinkleFactor = Math.random() * Math.PI;
+      this.color = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+      this.isPulsar = Math.random() < 0.12; // 12% are glowing pulsars
     }
     update() {
-      this.x += this.dx; this.y += this.dy;
-      if (this.x < 0 || this.x > w || this.y < 0 || this.y > h) this.reset();
+      this.x += this.vx;
+      this.y += this.vy;
+
+      // Twinkle
+      this.twinkleFactor += this.twinkleSpeed;
+      this.alpha = this.baseAlpha + Math.sin(this.twinkleFactor) * 0.25;
+      if (this.alpha < 0.1) this.alpha = 0.1;
+      if (this.alpha > 0.95) this.alpha = 0.95;
+
+      // Mouse interactive cosmic warp
+      const dx = mouse.x - this.x;
+      const dy = mouse.y - this.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < mouse.radius) {
+        const force = (1 - dist / mouse.radius) * 1.5;
+        this.x -= (dx / dist) * force;
+        this.y -= (dy / dist) * force;
+      }
+
+      // Wrap around bounds
+      if (this.x < -20 || this.x > w + 20 || this.y < -20 || this.y > h + 20) {
+        this.reset();
+      }
     }
     draw() {
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = this.color;
+      ctx.shadowBlur = this.isPulsar ? 14 : 6;
+      ctx.shadowColor = this.color;
+
       ctx.beginPath();
-      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(140,100,255,${this.alpha})`;
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
       ctx.fill();
+
+      // Pulsar 4-point cosmic lens diffraction
+      if (this.isPulsar && this.alpha > 0.5) {
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 0.7;
+        const spikeLen = this.size * 3.5;
+        ctx.beginPath();
+        ctx.moveTo(this.x - spikeLen, this.y);
+        ctx.lineTo(this.x + spikeLen, this.y);
+        ctx.moveTo(this.x, this.y - spikeLen);
+        ctx.lineTo(this.x, this.y + spikeLen);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
   }
 
-  for (let i = 0; i < 90; i++) particles.push(new Particle());
+  // Shooting Star / Meteor
+  class ShootingStar {
+    constructor() {
+      this.reset();
+    }
+    reset() {
+      this.x = Math.random() * w * 0.9;
+      this.y = Math.random() * (h * 0.45);
+      this.len = Math.random() * 110 + 60;
+      this.speed = Math.random() * 8 + 12;
+      this.angle = Math.PI / 4 + (Math.random() - 0.5) * 0.2; // ~45 deg
+      this.vx = Math.cos(this.angle) * this.speed;
+      this.vy = Math.sin(this.angle) * this.speed;
+      this.life = 0;
+      this.maxLife = Math.random() * 35 + 25;
+      this.active = false;
+      this.color = colorPalette[0];
+    }
+    trigger() {
+      this.reset();
+      this.active = true;
+    }
+    update() {
+      if (!this.active) return;
+      this.x += this.vx;
+      this.y += this.vy;
+      this.life++;
+      if (this.life >= this.maxLife || this.x > w + 100 || this.y > h + 100) {
+        this.active = false;
+      }
+    }
+    draw() {
+      if (!this.active) return;
+      const progress = this.life / this.maxLife;
+      const alpha = progress < 0.2 ? progress / 0.2 : 1 - (progress - 0.2) / 0.8;
 
-  (function loop() {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, alpha);
+      const tailX = this.x - Math.cos(this.angle) * this.len;
+      const tailY = this.y - Math.sin(this.angle) * this.len;
+
+      const grad = ctx.createLinearGradient(tailX, tailY, this.x, this.y);
+      grad.addColorStop(0, 'transparent');
+      grad.addColorStop(0.7, this.color);
+      grad.addColorStop(1, '#ffffff');
+
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(this.x, this.y);
+      ctx.stroke();
+
+      // Glowing meteor head
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // Populate Starfield
+  const starCount = Math.min(130, Math.floor((window.innerWidth * window.innerHeight) / 9000));
+  const stars = [];
+  for (let i = 0; i < starCount; i++) stars.push(new Star());
+
+  const shootingStars = [new ShootingStar(), new ShootingStar()];
+  let nextMeteorTime = Date.now() + 2500;
+
+  // Main Render Loop
+  function loop() {
     ctx.clearRect(0, 0, w, h);
-    particles.forEach(p => { p.update(); p.draw(); });
+
+    // Subtle Constellation Lines
+    for (let i = 0; i < stars.length; i++) {
+      for (let j = i + 1; j < stars.length; j++) {
+        const dx = stars[i].x - stars[j].x;
+        const dy = stars[i].y - stars[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 85) {
+          const alpha = (1 - dist / 85) * 0.16;
+          ctx.save();
+          ctx.strokeStyle = stars[i].color;
+          ctx.globalAlpha = alpha;
+          ctx.lineWidth = 0.6;
+          ctx.beginPath();
+          ctx.moveTo(stars[i].x, stars[i].y);
+          ctx.lineTo(stars[j].x, stars[j].y);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+
+    // Update & Draw Stars
+    stars.forEach(s => {
+      s.update();
+      s.draw();
+    });
+
+    // Handle Shooting Stars
+    if (Date.now() > nextMeteorTime) {
+      const inactive = shootingStars.find(m => !m.active);
+      if (inactive) inactive.trigger();
+      nextMeteorTime = Date.now() + Math.random() * 5000 + 3500; // Trigger every 3.5 - 8.5s
+    }
+    shootingStars.forEach(m => {
+      m.update();
+      m.draw();
+    });
+
     requestAnimationFrame(loop);
-  })();
+  }
+  loop();
 })();
 
 // ---------- Navbar scroll shadow ----------
@@ -281,17 +473,49 @@ document.querySelectorAll('.faq-question').forEach(btn => {
   setInterval(() => goTo((current + 1) % cards.length), 5000);
 })();
 
-// ---------- Theme toggle ----------
+// ---------- Dynamic Space Theme Switcher ----------
 const themeToggle = document.getElementById('theme-toggle');
 const themeIcon = document.getElementById('theme-icon');
-let isDark = true;
+const themeModeText = document.getElementById('theme-mode-text');
+
+const spaceThemes = [
+  { id: 'black-space', name: 'Black Space', icon: '\u{1F30C}', label: 'Black Space', toast: '\u{1F30C} Black Space Theme Activated' },
+  { id: 'aurora', name: 'Aurora', icon: '\u26A1', label: 'Aurora Space', toast: '\u26A1 Cosmic Aurora Theme Activated' },
+  { id: 'void', name: 'Void', icon: '\u{1FA90}', label: 'Eclipse Void', toast: '\u{1FA90} Deep Eclipse Void Theme Activated' }
+];
+
+let currentThemeIdx = 0;
+const savedTheme = localStorage.getItem('deepfake_space_theme');
+if (savedTheme) {
+  const foundIdx = spaceThemes.findIndex(t => t.id === savedTheme);
+  if (foundIdx !== -1) currentThemeIdx = foundIdx;
+}
+
+function applySpaceTheme(index, notify = false) {
+  currentThemeIdx = index;
+  const theme = spaceThemes[currentThemeIdx];
+  document.body.dataset.theme = theme.id;
+  if (themeIcon) themeIcon.textContent = theme.icon;
+  if (themeModeText) themeModeText.textContent = theme.name;
+  localStorage.setItem('deepfake_space_theme', theme.id);
+  if (typeof updateSpaceStarfieldColors === 'function') {
+    updateSpaceStarfieldColors();
+  }
+  if (notify) {
+    showToast(theme.toast, 'info', 2200);
+  }
+}
+
+// Apply on initial load
+applySpaceTheme(currentThemeIdx, false);
+
 if (themeToggle) {
   themeToggle.addEventListener('click', () => {
-    isDark = !isDark;
-    themeIcon.textContent = isDark ? '\u2606' : '\u2600';
-    showToast(isDark ? 'Dark mode enabled' : 'Light mode coming soon!', 'info', 2000);
+    const nextIdx = (currentThemeIdx + 1) % spaceThemes.length;
+    applySpaceTheme(nextIdx, true);
   });
 }
+
 
 // ---------- Upload & Detection Elements ----------
 const uploadArea = document.getElementById('upload-area');
