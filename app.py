@@ -727,13 +727,31 @@ async def serve_index():
 # Mount directory to serve style.css, script.js, and static assets
 app.mount("/", StaticFiles(directory=BASE_DIR, html=True), name="static")
 
+# ============================================================
+# Hugging Face Spaces & Gradio Compatibility
+# ============================================================
+demo = None
+try:
+    import gradio as gr
+    with gr.Blocks(title="Deepfake Detection AI Engine") as demo:
+        gr.Markdown("### 🌌 Deepfake Detection AI Engine Active\nAccess the web application at the main URL.")
+    app = gr.mount_gradio_app(app, demo, path="/gradio")
+except Exception as e:
+    demo = None
+
 if __name__ == "__main__":
     import uvicorn
     if BASE_DIR not in sys.path:
         sys.path.insert(0, BASE_DIR)
+    
+    # Auto-detect port: 7860 on Hugging Face Spaces, 8000 locally
+    port = int(os.environ.get("PORT", 7860 if os.environ.get("SPACE_ID") else 8000))
+    host = "0.0.0.0" if (os.environ.get("SPACE_ID") or os.environ.get("PORT")) else "127.0.0.1"
+    
     print("\n==================================================")
     print("🚀 Deepfake Detection Web Application Starting")
-    print(f"👉 Local URL: http://127.0.0.1:8000")
-    print("👉 API Docs:  http://127.0.0.1:8000/docs")
+    print(f"👉 URL:      http://{host}:{port}")
+    print(f"👉 API Docs: http://{host}:{port}/docs")
     print("==================================================\n")
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("app:app", host=host, port=port, reload=False if os.environ.get("SPACE_ID") else True)
+
