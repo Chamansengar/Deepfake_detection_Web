@@ -28,9 +28,7 @@ from fastapi.responses import FileResponse, JSONResponse
 # 0. Setup Paths & Support for Optional Temporal Model
 # ============================================================
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-AI_MODEL_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Ai model'))
-if os.path.isdir(AI_MODEL_DIR) and AI_MODEL_DIR not in sys.path:
-    sys.path.append(AI_MODEL_DIR)
+CHECKPOINT_DIR = os.path.join(BASE_DIR, 'checkpoints')
 
 temporal_model = None
 temporal_seq_len = 16
@@ -97,8 +95,7 @@ def cap_image_size(img_pil: Image.Image, max_dim: int = MAX_INPUT_DIMENSION):
 # 3. Initialize InceptionResnetV1 Model
 # ============================================================
 CHECKPOINT_CANDIDATES = [
-    os.path.join(BASE_DIR, 'checkpoints', 'best_model.pth'),
-    os.path.join(AI_MODEL_DIR, 'checkpoints', 'best_model.pth'),
+    os.path.join(CHECKPOINT_DIR, 'best_model.pth'),
 ]
 CHECKPOINT_PATH = next((p for p in CHECKPOINT_CANDIDATES if os.path.isfile(p)), None)
 
@@ -140,10 +137,8 @@ resnet.eval()
 # 3b. Initialize Temporal Model (if checkpoints exist)
 # ============================================================
 TEMPORAL_CANDIDATES = [
-    os.path.join(BASE_DIR, 'checkpoints', 'best_temporal_model.pth'),
-    os.path.join(BASE_DIR, 'checkpoints', 'best_temporal_clips_model.pth'),
-    os.path.join(AI_MODEL_DIR, 'checkpoints', 'best_temporal_model.pth'),
-    os.path.join(AI_MODEL_DIR, 'checkpoints', 'best_temporal_clips_model.pth'),
+    os.path.join(CHECKPOINT_DIR, 'best_temporal_model.pth'),
+    os.path.join(CHECKPOINT_DIR, 'best_temporal_clips_model.pth'),
 ]
 _temporal_ckpt_path = next((p for p in TEMPORAL_CANDIDATES if os.path.isfile(p)), None)
 
@@ -727,31 +722,18 @@ async def serve_index():
 # Mount directory to serve style.css, script.js, and static assets
 app.mount("/", StaticFiles(directory=BASE_DIR, html=True), name="static")
 
-# ============================================================
-# Hugging Face Spaces & Gradio Compatibility
-# ============================================================
-demo = None
-try:
-    import gradio as gr
-    with gr.Blocks(title="Deepfake Detection AI Engine") as demo:
-        gr.Markdown("### 🌌 Deepfake Detection AI Engine Active\nAccess the web application at the main URL.")
-    app = gr.mount_gradio_app(app, demo, path="/gradio")
-except Exception as e:
-    demo = None
-
 if __name__ == "__main__":
     import uvicorn
     if BASE_DIR not in sys.path:
         sys.path.insert(0, BASE_DIR)
-    
-    # Auto-detect port: 7860 on Hugging Face Spaces, 8000 locally
-    port = int(os.environ.get("PORT", 7860 if os.environ.get("SPACE_ID") else 8000))
-    host = "0.0.0.0" if (os.environ.get("SPACE_ID") or os.environ.get("PORT")) else "127.0.0.1"
-    
+
+    port = 8000
+    host = "127.0.0.1"
+
     print("\n==================================================")
     print("🚀 Deepfake Detection Web Application Starting")
     print(f"👉 URL:      http://{host}:{port}")
     print(f"👉 API Docs: http://{host}:{port}/docs")
     print("==================================================\n")
-    uvicorn.run("app:app", host=host, port=port, reload=False if os.environ.get("SPACE_ID") else True)
+    uvicorn.run("app:app", host=host, port=port, reload=True)
 

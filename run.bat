@@ -4,9 +4,7 @@ echo ========================================================
 echo Starting Deepfake Detection Web Application (FastAPI)
 echo ========================================================
 
-IF EXIST "..\Ai model\.venv\Scripts\python.exe" (
-    set "PYTHON_CMD=..\Ai model\.venv\Scripts\python.exe"
-) ELSE IF EXIST ".venv\Scripts\python.exe" (
+IF EXIST ".venv\Scripts\python.exe" (
     set "PYTHON_CMD=.venv\Scripts\python.exe"
 ) ELSE (
     set "PYTHON_CMD=python"

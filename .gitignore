@@ -7,4 +7,3 @@ checkpoints/
 env/
 venv/
 *.tmp
-cloudflared.exe

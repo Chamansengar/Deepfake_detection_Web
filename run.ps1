@@ -9,9 +9,7 @@ if (-not $scriptDir) { $scriptDir = "." }
 
 $pythonExe = "python"
 $candidatePaths = @(
-    (Join-Path $scriptDir "..\Ai model\.venv\Scripts\python.exe"),
     (Join-Path $scriptDir ".venv\Scripts\python.exe"),
-    "..\Ai model\.venv\Scripts\python.exe",
     ".venv\Scripts\python.exe"
 )
 
