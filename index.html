@@ -373,7 +373,7 @@
                 <div class="detail-row" id="row-threshold"><span>Threshold / TTA</span><span id="detail-settings">—</span></div>
             </div>
 
-            <button class="download-report-btn" id="download-report" hidden>&#128196; Download Forensic Report</button>
+            <button class="download-report-btn" id="download-report" hidden>&#128196; Download Forensic PDF Report</button>
         </div>
     </section>
 
@@ -504,6 +504,13 @@
     <!-- Toast container -->
     <div class="toast-container" id="toast-container"></div>
 
+    <!-- PDF Generation Engine (Local with CDN Fallback) -->
+    <script src="jspdf.umd.min.js"></script>
+    <script>
+        if (!window.jspdf && !window.jsPDF) {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>');
+        }
+    </script>
     <script src="script.js?v=clean2"></script>
 </body>
 </html>
