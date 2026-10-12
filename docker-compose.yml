@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  deepfake-detector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: deepfake-ai-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    volumes:
+      - ./runs:/app/runs
+      - ./checkpoints:/app/checkpoints
