@@ -722,18 +722,44 @@ async def serve_index():
 # Mount directory to serve style.css, script.js, and static assets
 app.mount("/", StaticFiles(directory=BASE_DIR, html=True), name="static")
 
+# ============================================================
+# Optional Gradio Interface (For Free Hugging Face Spaces SDK)
+# ============================================================
+try:
+    import gradio as gr
+    with gr.Blocks(title="Deepfake Detection AI Forensic Engine") as demo:
+        gr.Markdown("# 🌌 Deepfake Detection AI — Forensic Inspection Platform")
+        gr.Markdown(
+            "The full custom **Dynamic Black Space Dark** user interface is running live on this instance! "
+            "Click below to access the full interactive dashboard or use the REST API."
+        )
+        gr.HTML(
+            '<div style="margin: 20px 0;">'
+            '<a href="/" style="display:inline-block; padding:12px 24px; background:linear-gradient(135deg,#00f2fe,#4facfe); color:#000; font-weight:700; border-radius:8px; text-decoration:none; margin-right:12px;">🚀 Open Full Black Space App</a>'
+            '<a href="/docs" style="display:inline-block; padding:12px 24px; background:#1e293b; color:#00f2fe; border:1px solid #00f2fe; font-weight:600; border-radius:8px; text-decoration:none;">📑 Open Swagger API Docs</a>'
+            '</div>'
+        )
+    app = gr.mount_gradio_app(app, demo, path="/gradio")
+    print("[*] Gradio Space integration active at /gradio")
+except Exception as e:
+    print(f"Notice: Gradio mounting bypassed: {e}")
+
 if __name__ == "__main__":
     import uvicorn
     if BASE_DIR not in sys.path:
         sys.path.insert(0, BASE_DIR)
 
-    port = 8000
-    host = "127.0.0.1"
+    # Hugging Face Spaces defaults to port 7860; local development defaults to 8000
+    port = int(os.environ.get("PORT", 7860 if "SPACE_ID" in os.environ else 8000))
+    host = "0.0.0.0"
 
     print("\n==================================================")
     print("🚀 Deepfake Detection Web Application Starting")
     print(f"👉 URL:      http://{host}:{port}")
     print(f"👉 API Docs: http://{host}:{port}/docs")
+    if "SPACE_ID" in os.environ:
+        print("🌌 Running inside Hugging Face Spaces environment")
     print("==================================================\n")
-    uvicorn.run("app:app", host=host, port=port, reload=True)
+    uvicorn.run("app:app", host=host, port=port, reload=False)
+
 
