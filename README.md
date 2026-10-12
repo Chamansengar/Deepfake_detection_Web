@@ -1,3 +1,14 @@
+---
+title: Deepfake Detection AI
+emoji: 🌌
+colorFrom: blue
+colorTo: indigo
+sdk: gradio
+app_file: app.py
+pinned: false
+license: mit
+---
+
 # 🌌 Deepfake Detection AI — Multi-Modal Forensic Platform
 
 
