@@ -24,4 +24,4 @@ Write-Host "Using Python: $pythonExe" -ForegroundColor Yellow
 Write-Host "Serving on: http://127.0.0.1:8000" -ForegroundColor Cyan
 Write-Host "API Docs:   http://127.0.0.1:8000/docs" -ForegroundColor Cyan
 
-& $pythonExe -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload
+& $pythonExe -m uvicorn backend.app:app --host 127.0.0.1 --port 8000 --reload

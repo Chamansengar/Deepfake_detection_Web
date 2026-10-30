@@ -37,7 +37,13 @@ license: mit
 5. [API Specification](#-api-specification)
 6. [Project File Structure](#-project-file-structure)
 7. [Getting Started & Installation](#-getting-started--installation)
-8. [Configuration & Parameters](#-configuration--parameters)
+8. [Deployment Guide (Separated Frontend & Backend)](#-deployment-guide-separated-frontend--backend)
+   - [Cross-Origin Communication & Dynamic URL](#1-how-frontend-and-backend-communicate)
+   - [Backend Deployment (Render / HF Spaces / Docker)](#2-deploying-the-backend)
+   - [Frontend Deployment (Vercel / Netlify / GitHub Pages)](#3-deploying-the-frontend)
+   - [Connecting Frontend to Deployed Backend](#4-connecting-frontend-to-backend)
+9. [Configuration & Parameters](#-configuration--parameters)
+10. [License & Ethical Notice](#-license--ethical-notice)
 
 ---
 
@@ -313,15 +319,32 @@ Upload an audio file for speech deepfake detection, forensic feature extraction,
 
 ```text
 Deepfake Detection/
-├── app.py                 # FastAPI backend, routing, computer vision & Grad-CAM pipeline
-├── audio_model.py         # Wav2Vec2 transformer & acoustic forensic indicator analysis
-├── index.html             # Black Space Dark user interface layout
-├── style.css              # Black Space Dark theme styling & typography definitions
-├── script.js              # Space starfield canvas engine, theme switcher, & client API calls
-├── run.bat                # Windows launch script
-├── run.ps1                # PowerShell automated execution script
-├── runs/                  # Directory containing processed and annotated video results
-└── README.md              # Project documentation & system architecture blueprint
+├── backend/
+│   ├── app.py                 # FastAPI backend, inference pipeline, & Grad-CAM integration
+│   ├── audio_model.py         # Wav2Vec2 speech transformer & acoustic forensic analysis
+│   ├── temporal_model.py      # Optional multi-frame temporal video sequence model
+│   ├── requirements.txt       # Backend Python dependencies
+│   ├── checkpoints/           # Trained deep learning model weights
+│   │   └── best_model.pth     # InceptionResnetV1 deepfake classifier weights (~114 MB)
+│   └── runs/                  # Generated annotated forensic video artifacts
+├── frontend/
+│   ├── index.html             # Black Space Dark user interface layout
+│   ├── style.css              # Black Space Dark theme styling & typography definitions
+│   ├── script.js              # Cosmic starfield canvas engine, state, & API client
+│   └── jspdf.umd.min.js       # Client-side forensic audit PDF report generator
+├── training/
+│   ├── dataset.py             # PyTorch dataset loader for facial images
+│   ├── train.py               # Model training script for InceptionResnetV1
+│   ├── train_temporal.py      # Temporal sequence model training script
+│   ├── video_clip_dataset.py  # Video sequence dataset generator
+│   └── test_suite.py          # Testing and validation pipeline
+├── colab_training.ipynb       # Google Colab notebook for GPU model training
+├── colab_deploy.ipynb         # Google Colab notebook for quick cloud deployment
+├── packages.txt               # System dependencies (ffmpeg, libsndfile1)
+├── run.bat                    # Windows launch script
+├── run.ps1                    # PowerShell automated launch script
+├── ARCHITECTURE.md            # Exhaustive system architecture specification
+└── README.md                  # Project documentation & deployment blueprints
 ```
 
 ---
@@ -330,7 +353,7 @@ Deepfake Detection/
 
 ### Prerequisites
 - Python 3.10 or higher
-- NVIDIA CUDA-capable GPU (recommended, fallback to CPU is automatic)
+- NVIDIA CUDA-capable GPU (recommended; multithreaded CPU fallback is automatic)
 - Modern web browser (Chrome, Edge, Firefox, Brave)
 
 ### 1. Clone the Repository
@@ -342,31 +365,146 @@ cd "Deepfake Detection"
 ### 2. Set Up Virtual Environment
 ```bash
 python -m venv .venv
+
 # On Windows:
 .venv\Scripts\activate
+
 # On Linux/macOS:
 source .venv/bin/activate
 ```
 
-### 3. Install Dependencies
+### 3. Install Backend Dependencies
 ```bash
-pip install fastapi uvicorn python-multipart torch torchvision facenet-pytorch pytorch-grad-cam opencv-python Pillow librosa soundfile transformers matplotlib numpy
+pip install -r backend/requirements.txt
 ```
 
 ### 4. Run the Application
-You can run the web server using PowerShell:
+You can run the full-stack server using PowerShell:
 ```powershell
 .\run.ps1
 ```
 Or directly with Uvicorn:
 ```bash
-uvicorn app:app --host 127.0.0.1 --port 8000 --reload
+uvicorn backend.app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 ### 5. Access the Web Application
 Open your browser and navigate to:
 - **Web UI:** [http://127.0.0.1:8000](http://127.0.0.1:8000)
 - **Interactive API Documentation:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+---
+
+## 🌐 Deployment Guide (Separated Frontend & Backend)
+
+The project is architected so the **Frontend** and **Backend** can be deployed independently across different cloud providers.
+
+```mermaid
+flowchart LR
+    subgraph Frontend_Cloud["Frontend (Static CDN Host)"]
+        UI_HOST["Vercel / Netlify / GitHub Pages"]
+        RESOLVE["window.DEEPFAKE_API_URL"]
+    end
+
+    subgraph Backend_Cloud["Backend (AI Compute Host)"]
+        API_HOST["Render / HF Spaces / Cloud VM / Docker"]
+        CORS_CONF["FastAPI CORS (allow_origins=['*'])"]
+        INFER["InceptionResnetV1 + MTCNN + Wav2Vec2"]
+    end
+
+    UI_HOST --> RESOLVE
+    RESOLVE -->|Cross-Origin HTTPS REST API| CORS_CONF
+    CORS_CONF --> API_HOST
+    API_HOST --> INFER
+```
+
+### 1. How Frontend and Backend Communicate
+- The frontend in `frontend/script.js` determines the target API using:
+  ```javascript
+  const API_BASE = window.DEEPFAKE_API_URL || localStorage.getItem('deepfake_api_url') || '';
+  ```
+- If `API_BASE` is empty (`''`), it requests `/api/...` on the same domain (unified hosting).
+- When separated, setting `window.DEEPFAKE_API_URL = "https://your-backend.onrender.com"` routes all forensic calls seamlessly across origins.
+- `backend/app.py` has full CORS middleware configured (`allow_origins=["*"]`), so modern browsers will allow direct cross-origin API calls without preflight issues.
+
+---
+
+### 2. Deploying the Backend
+
+The backend requires a host supporting Python and PyTorch with at least 1–2 GB RAM.
+
+#### Option A: Hugging Face Spaces (Recommended Free Tier — 16 GB RAM)
+1. Go to [Hugging Face Spaces](https://huggingface.co/new-space) and create a new Space.
+2. Choose **Docker** or **Gradio** as the SDK.
+3. Push your repository to your Hugging Face Space remote.
+4. Your repository already includes `packages.txt` (`ffmpeg`, `libsndfile1`) and `backend/requirements.txt`.
+5. Hugging Face assigns a public URL: `https://<username>-<space-name>.hf.space`.
+
+#### Option B: Render.com (Web Service)
+1. Create a free account at [Render.com](https://render.com).
+2. Click **New +** $\rightarrow$ **Web Service** and connect your GitHub repository.
+3. Set the configuration:
+   - **Environment:** `Python 3`
+   - **Build Command:**
+     ```bash
+     pip install --upgrade pip
+     pip install -r backend/requirements.txt
+     ```
+   - **Start Command:**
+     ```bash
+     uvicorn backend.app:app --host 0.0.0.0 --port $PORT
+     ```
+4. Click **Deploy Web Service** and copy your live backend URL (`https://<service-name>.onrender.com`).
+5. Confirm the backend is live by checking `https://<service-name>.onrender.com/api/status`.
+
+---
+
+### 3. Deploying the Frontend
+
+The `frontend/` folder contains pure static HTML, CSS, and JavaScript. No build step or Node.js environment is required.
+
+#### Option A: Vercel (Recommended)
+1. Sign in to [Vercel](https://vercel.com) $\rightarrow$ **Add New Project** $\rightarrow$ Import your GitHub repo.
+2. In project settings:
+   - **Root Directory:** Select `frontend`
+   - **Framework Preset:** `Other` (leave Build Command blank)
+3. *(Optional)* Add a `frontend/vercel.json` rewrite to route `/api/*` to your backend URL:
+   ```json
+   {
+     "rewrites": [
+       { "source": "/api/:path*", "destination": "https://<your-backend-url>/api/:path*" }
+     ]
+   }
+   ```
+4. Click **Deploy**. Vercel gives you an instant global HTTPS URL.
+
+#### Option B: Netlify
+1. Sign in to [Netlify](https://www.netlify.com).
+2. Select **Add new site** $\rightarrow$ **Import from existing project**.
+3. Set **Base directory** to `frontend` and deploy.
+4. *(Optional)* Add a `frontend/_redirects` file:
+   ```text
+   /api/*  https://<your-backend-url>/api/:splat  200
+   ```
+
+#### Option C: GitHub Pages
+1. In your GitHub repository, navigate to **Settings** $\rightarrow$ **Pages**.
+2. Select the branch and deploy the `frontend` directory (or use a GitHub Action like `peaceiris/actions-gh-pages`).
+
+---
+
+### 4. Connecting Frontend to Backend
+
+In `frontend/index.html`, add this small configuration tag inside `<head>` **above** `<script src="script.js"></script>`:
+
+```html
+<script>
+  // Point directly to your deployed backend URL (no trailing slash)
+  window.DEEPFAKE_API_URL = "https://your-backend-url.com";
+</script>
+```
+
+> **Tip:** You can also dynamically update the backend URL at any time directly in the web UI by clicking the status badge in the header!
 
 ---
 

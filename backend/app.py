@@ -27,7 +27,9 @@ from fastapi.responses import FileResponse, JSONResponse
 # ============================================================
 # 0. Setup Paths & Support for Optional Temporal Model
 # ============================================================
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))        # backend/
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, '..')) # project root
+FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'frontend')        # frontend/
 CHECKPOINT_DIR = os.path.join(BASE_DIR, 'checkpoints')
 
 temporal_model = None
@@ -707,7 +709,7 @@ async def get_video_result(filename: str):
 # ============================================================
 @app.get("/")
 async def serve_index():
-    index_path = os.path.join(BASE_DIR, "index.html")
+    index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.isfile(index_path):
         return FileResponse(
             index_path,
@@ -717,10 +719,10 @@ async def serve_index():
                 "Expires": "0"
             }
         )
-    return {"message": "Deepfake Detection API is running. index.html not found."}
+    return {"message": "Deepfake Detection API is running. Frontend not found at: " + FRONTEND_DIR}
 
-# Mount directory to serve style.css, script.js, and static assets
-app.mount("/", StaticFiles(directory=BASE_DIR, html=True), name="static")
+# Mount frontend directory to serve style.css, script.js, and static assets
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="static")
 
 # ============================================================
 # Optional Gradio Interface (For Free Hugging Face Spaces SDK)
@@ -746,8 +748,10 @@ except Exception as e:
 
 if __name__ == "__main__":
     import uvicorn
-    if BASE_DIR not in sys.path:
-        sys.path.insert(0, BASE_DIR)
+    # Ensure project root and backend dir are on sys.path for imports
+    for p in [PROJECT_ROOT, BASE_DIR]:
+        if p not in sys.path:
+            sys.path.insert(0, p)
 
     # Hugging Face Spaces defaults to port 7860; local development defaults to 8000
     port = int(os.environ.get("PORT", 7860 if "SPACE_ID" in os.environ else 8000))
@@ -757,9 +761,10 @@ if __name__ == "__main__":
     print("🚀 Deepfake Detection Web Application Starting")
     print(f"👉 URL:      http://{host}:{port}")
     print(f"👉 API Docs: http://{host}:{port}/docs")
+    print(f"📂 Backend:  {BASE_DIR}")
+    print(f"📂 Frontend: {FRONTEND_DIR}")
     if "SPACE_ID" in os.environ:
         print("🌌 Running inside Hugging Face Spaces environment")
     print("==================================================\n")
-    uvicorn.run("app:app", host=host, port=port, reload=False)
-
+    uvicorn.run("backend.app:app", host=host, port=port, reload=False)
 

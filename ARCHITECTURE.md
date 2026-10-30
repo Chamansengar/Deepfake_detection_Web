@@ -6,21 +6,22 @@ This document provides the exhaustive architectural blueprint, subsystem specifi
 
 ## 1. Architectural Overview & Design Principles
 
-The platform follows a **decoupled, event-driven client-server architecture** designed for high throughput, low latency, and multi-modal forensic inspection.
+The platform follows a **modular, decoupled client-server architecture** designed for high throughput, low latency, and multi-modal forensic inspection. It supports both **monolithic unified hosting** (FastAPI serving static frontend assets) and **independent distributed deployment** (Frontend and Backend hosted completely separately across distinct cloud providers).
 
 ```mermaid
 graph TB
-    subgraph Client_Boundary["Presentation & Client Subsystem"]
+    subgraph Client_Boundary["Presentation & Client Subsystem (Static CDN / Browser)"]
         SPA["Single-Page Web Client (HTML5 / Vanilla ES6+ / CSS3)"]
         CANVAS_SYS["Dynamic Black Space Starfield & Meteor Engine"]
         VIS_SWITCH["Explainability Visualizer Switcher"]
         SETTINGS_DRAWER["Forensic Hyperparameter Drawer"]
+        API_CONFIG["API Base Resolver (window.DEEPFAKE_API_URL / LocalStorage)"]
     end
 
-    subgraph Transport_Boundary["Network & Ingress Subsystem"]
-        FASTAPI["FastAPI Ingress Router & Middleware"]
-        CORS["CORS Middleware"]
-        STATIC_SRV["StaticFiles Asset Server"]
+    subgraph Transport_Boundary["Network & Ingress Subsystem (FastAPI / Uvicorn)"]
+        FASTAPI["FastAPI Ingress Router & API Endpoints"]
+        CORS["CORS Middleware (allow_origins=['*'], preflight OPTIONS)"]
+        STATIC_SRV["StaticFiles Asset Server (Optional fallback)"]
     end
 
     subgraph Compute_Boundary["Multi-Modal Neural Inference Engine"]
@@ -46,7 +47,8 @@ graph TB
         RUNS_DIR["Annotated Video Storage (/runs)"]
     end
 
-    SPA -->|Multipart/Form-Data| FASTAPI
+    SPA --> API_CONFIG
+    API_CONFIG -->|CORS HTTP POST Multipart/Form-Data| FASTAPI
     FASTAPI --> TEMP_MEM
     TEMP_MEM --> Vision_Subsystem
     TEMP_MEM --> Audio_Subsystem
@@ -182,7 +184,41 @@ graph TD
 
 ---
 
-## 5. Security, Resilience & Privacy Governance
+## 5. Distributed Deployment & Decoupled Topology
+
+The system is engineered to allow **zero-friction separate deployment** of the frontend and backend tiers:
+
+```mermaid
+flowchart LR
+    subgraph Frontend_Host["Frontend Tier (Edge / Static CDN)"]
+        direction TB
+        CDN["Static Host: Vercel / Netlify / GitHub Pages"]
+        ENV["Endpoint Resolver: window.DEEPFAKE_API_URL"]
+        ASSETS["index.html + style.css + script.js"]
+    end
+
+    subgraph Backend_Host["Backend Tier (ML Compute / GPU / Container)"]
+        direction TB
+        API_RUN["FastAPI + Uvicorn: Render / HF Spaces / Cloud VM"]
+        CORS_LAYER["CORS: allow_origins=['*'] & Preflight Handling"]
+        TORCH["PyTorch + MTCNN + InceptionResnetV1 + Wav2Vec2"]
+    end
+
+    CDN --> ASSETS
+    ASSETS --> ENV
+    ENV -->|Cross-Origin HTTPS REST Calls| CORS_LAYER
+    CORS_LAYER --> API_RUN
+    API_RUN --> TORCH
+```
+
+### Key Separation Mechanisms:
+1. **Dynamic Origin Resolution**: `frontend/script.js` checks `window.DEEPFAKE_API_URL` first, falls back to `localStorage.getItem('deepfake_api_url')`, and defaults to current host (`''`). This allows identical client code to run locally, behind a reverse proxy, or across independent domain names.
+2. **Permissive CORS Negotiation**: `backend/app.py` exposes `CORSMiddleware` with `allow_origins=["*"]`, `allow_credentials=True`, `allow_methods=["*"]`, and `allow_headers=["*"]`, permitting browser clients hosted on Vercel, Netlify, or custom domains to dispatch inference payloads without browser preflight rejection.
+3. **Stateless API Ingress**: Inference endpoints (`/api/detect-image`, `/api/detect-video`, `/api/detect-audio`) operate statelessly with in-memory uploads, freeing the frontend and backend from shared session affinity constraints.
+
+---
+
+## 6. Security, Resilience & Privacy Governance
 
 1. **Payload Size Restrictions:** Max upload size constrained to 50 MB to prevent denial-of-service via resource exhaustion.
 2. **Format Whitelisting:** Strict mime-type and extension validation for Images (`.jpg`, `.jpeg`, `.png`, `.webp`), Videos (`.mp4`, `.avi`, `.mov`, `.webm`), and Audio (`.wav`, `.mp3`, `.m4a`, `.flac`).
