@@ -18,3 +18,7 @@ data/
 
 # Temp files
 *.tmp
+
+# Presentation notes
+presentation.txt
+

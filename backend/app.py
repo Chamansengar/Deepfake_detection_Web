@@ -32,6 +32,10 @@ PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, '..')) # project root
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'frontend')        # frontend/
 CHECKPOINT_DIR = os.path.join(BASE_DIR, 'checkpoints')
 
+for p in [BASE_DIR, PROJECT_ROOT]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
 temporal_model = None
 temporal_seq_len = 16
 TemporalDeepfakeModel = None
